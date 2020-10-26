@@ -7,15 +7,7 @@ from owlready2 import get_ontology
 from owlready2 import Ontology
 from rdflib import Graph
 
-
-ONTOLOGY_URL_TEMPLATE = ("https://raw.githubusercontent.com/linhd-postdata/"
-                         "{onto}-ontology/master/postdata-{onto}.owl")
-ONTOLOGIES = {
-    "core":       ONTOLOGY_URL_TEMPLATE.format(onto="core"),
-    "structural": ONTOLOGY_URL_TEMPLATE.format(onto="structuralElements"),
-    "prosodic":   ONTOLOGY_URL_TEMPLATE.format(onto="prosodicElements"),
-    "literary":   ONTOLOGY_URL_TEMPLATE.format(onto="literaryAnalysis"),
-}
+from horace.utils import NAMESPACES
 
 
 def get_scansion_graph(scansion: dict) -> Graph:
@@ -23,7 +15,7 @@ def get_scansion_graph(scansion: dict) -> Graph:
     :param scansion: Dictionary with a Rantanplan-like scansion analysis
     :return: RDFLib Graph with the individuals from scansion
     """
-    structural_onto = get_ontology(ONTOLOGIES["structural"]).load()
+    structural_onto = get_ontology(NAMESPACES["structural"]).load()
     onto = add_structural_individuals(scansion, structural_onto)
     return onto_to_graph(onto)
 
