@@ -8,7 +8,8 @@ DATES = Namespace(NAMESPACES['pddates'])
 
 
 def get_core_graph(poem: dict) -> Graph:
-    """Transform an Averell poem data dictionary into a :class:`rdflib.Graph`.
+    """Transform an Averell poem data dictionary into a :class:`rdflib.Graph`
+    compliant with POSTDATA CORE ontology.
 
     :param poem: Dictionary with an Averell-like poem info
     :type poem: dict
@@ -33,11 +34,11 @@ def get_core_graph(poem: dict) -> Graph:
     r_creator = create_uri(onto_class="CR", author=author, poem_title=title)
     r_poetic_work = create_uri(onto_class="PW", author=author, poem_title=title)
     r_person = create_uri(onto_class="P", author=author)
-
+    concept_creator = URIRef("http://postdata.linhd.uned.es/kos/role-function/creator")
     # Add Types
     g.add((r_poetic_work, RDF.type, CORE.PoeticWork))
     g.add((r_redaction, RDF.type, CORE.Redaction))
-    g.add((r_creator, RDF.type, CORE.CreatorRole))
+    g.add((r_creator, RDF.type, CORE.AgentRole))
     g.add((r_person, RDF.type, CORE.Person))
 
     # Labels
@@ -47,16 +48,18 @@ def get_core_graph(poem: dict) -> Graph:
     g.add((r_redaction, CORE.text, Literal(poem_text, lang="es")))
     g.add((r_redaction, CORE.incipit, Literal(incipit, lang="es")))
     g.add((r_redaction, CORE.explicit, Literal(explicit, lang="es")))
+    g.add((r_redaction, DC.creator, Literal(author, lang="es")))
     g.add((r_person, CORE.name, Literal(author, lang="es")))
     g.add((r_creator, CORE.isAnonymous,
            Literal((True if author == "unknown" else False),
                    datatype=XSD.boolean)))
+    g.add((r_creator, CORE.roleFunction, concept_creator))
 
     # Object Properties
     g.add((r_poetic_work, CORE.isRealisedThrough, r_redaction))
-    g.add((r_poetic_work, CORE.hasCreator, r_creator))
-    g.add((r_redaction, CORE.hasCreator, r_creator))
-    g.add((r_creator, CORE.isRoleOf, r_person))
+    g.add((r_poetic_work, CORE.hasAgentRole, r_creator))
+    g.add((r_redaction, CORE.hasAgentRole, r_creator))
+    g.add((r_creator, CORE.hasAgent, r_person))
 
     if "year" in poem:
         year = poem["year"]
