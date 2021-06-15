@@ -4,18 +4,18 @@ from slugify import slugify
 NAMESPACE_URL_TEMPLATE = ("http://postdata.linhd.uned.es/ontology/"
                           "postdata-{onto}#")
 
-NAMESPACES = {"xsd": "http://www.w3.org/2001/XMLSchema#",
-              "objectrole": "http://www.ontologydesignpatterns.org/cp/owl/objectrole.owl#",
-              "obj": "http://www.openrdf.org/rdf/2009/object#",
-              "skos": "http://www.w3.org/2004/02/skos/core#",
-              "pdc": NAMESPACE_URL_TEMPLATE.format(onto="core"),
-              "pdm": NAMESPACE_URL_TEMPLATE.format(
-                  onto="metricalAnalysis"),
-              "pdd": "http://postdata.linhd.uned.es/ontology/postdata-dates#",
-              "pd": "http://postdata.linhd.uned.es/resource/",
-              "dc": "http://purl.org/dc/elements/1.1/",
-              "foaf": "http://xmlns.com/foaf/0.1/",
-              }
+NAMESPACES = {
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "objectrole": "http://www.ontologydesignpatterns.org/cp/owl/objectrole.owl#",
+    "obj": "http://www.openrdf.org/rdf/2009/object#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "pdc": NAMESPACE_URL_TEMPLATE.format(onto="core"),
+    "pdm": NAMESPACE_URL_TEMPLATE.format(onto="metricalAnalysis"),
+    "pdd": NAMESPACE_URL_TEMPLATE.format(onto="dates"),
+    "pd": "http://postdata.linhd.uned.es/resource/",
+    "dc": "http://purl.org/dc/elements/1.1/",
+    "foaf": "http://xmlns.com/foaf/0.1/",
+}
 
 
 def create_uri(*uri_data) -> URIRef:
