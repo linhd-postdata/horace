@@ -103,6 +103,21 @@ def add_metrical_elements(_json) -> Graph:
 
 
 def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
+    """Function to generate RDF triples from rantanplan scansion output for a
+    poem.
+
+    :param scansion: dict with rantanplan output
+    :type scansion: dict
+    :param poem_title: Title of the poem to be analyzed
+    :type poem_title: str
+    :param author: Author of the poem to be analyzed
+    :type author: str
+    :param dataset: Dataset of the poem to be analyzed
+    :type dataset: str
+    :return: Graph with the RDF triples compliant with
+        POSTDATA Metrical Analysis ontology
+    :rtype: Graph
+    """
     g = Graph()
     r_redaction = create_uri("R", author, poem_title, dataset)
     r_stanza_list = create_uri("SL", poem_title, author, dataset)
@@ -115,7 +130,6 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
     g.add((r_redaction, METRICAL.hasStanzaList, r_stanza_list))
     g.add((r_redaction, METRICAL.hasLineList, r_line_list))
     line_count = 0
-    word_count = 0
     syllable_count = 0
     structure = None
     for st_index, stanza in enumerate(scansion):
@@ -127,8 +141,11 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
         # Add Stanza Type
         g.add((r_stanza, RDF.type, METRICAL.Stanza))
         g.add((r_stanza_pattern, RDF.type, METRICAL.StanzaPattern))
-        # Add Stanza to StanzaList
+        # Add Stanza to StanzaList and to Redaction
         g.add((r_stanza_list, METRICAL.stanza, r_stanza))
+        g.add((r_redaction, METRICAL.hasStanza, r_stanza))
+        # Add StanzaPattern to Stanza
+        g.add((r_stanza, METRICAL.hasStanzaPattern, r_stanza_pattern))
 
         # Add Stanza DP
         g.add((r_stanza, METRICAL.content, Literal(stanza_text, lang="es")))
@@ -159,6 +176,9 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
             r_word_list = create_uri("WL", l_index, st_index, author,
                                      poem_title,
                                      dataset)
+            r_punctuation_list = create_uri("PL", l_index, st_index, author,
+                                            poem_title,
+                                            dataset)
             r_grammatical_list = create_uri("GSL", l_index, st_index, author,
                                             poem_title,
                                             dataset)
@@ -185,9 +205,9 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                    r_grammatical_list))
             g.add((r_line, METRICAL.hasMetricalSyllableList, r_metrical_list))
             # Add pattern to line
-            g.add((r_line, METRICAL.hasPattern, r_line_pattern))
+            g.add((r_line, METRICAL.hasLinePattern, r_line_pattern))
             # Add line DP
-            g.add((r_line, METRICAL.indexInStanza,
+            g.add((r_line, METRICAL.relativeLineNumber,
                    Literal(l_index, datatype=XSD.nonNegativeInteger)))
             g.add((r_line, METRICAL.absoluteLineNumber,
                    Literal(str(line_count), datatype=XSD.nonNegativeInteger)))
@@ -198,10 +218,8 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
             if not structure and line.get("structure") is not None:
                 structure = line["structure"]
                 r_stype = URIRef(KOS + slugify(structure))
-                g.add((r_stanza, METRICAL.typeOfStanza, r_stype))
+                g.add((r_stanza_pattern, METRICAL.metricalType, r_stype))
                 g.add((r_stype, RDFS.label, Literal(structure)))
-                g.add((r_stanza_pattern, METRICAL.rhymeDispositionType,
-                       Literal(structure)))
             if "tokens" not in line:
                 continue
             line_text = join_tokens(line["tokens"])
@@ -217,14 +235,12 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                        create_uri("L", str(line_count - 1), st_index, author,
                                   poem_title,
                                   dataset)))
-            if int(st_index) + 1 == len(scansion) and int(l_index) + 1 == len(
-                stanza):
+            if int(st_index) + 1 == len(scansion) and int(l_index) + 1 == len(stanza):
                 g.add((r_line_list, METRICAL.lastLine, r_line))
             else:
                 g.add((r_line, METRICAL.nextLine,
                        create_uri("L", str(line_count + 1), st_index, author,
-                                  poem_title,
-                                  dataset)))
+                                  poem_title, dataset)))
             # last Word of Line, add Rhyme to the Word URIRef
             rhyme_label = line["rhyme"]
             rhyme_ending = line["ending"]
@@ -236,20 +252,34 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
             last_word_index = get_last_word_index(line["tokens"])
 
             r_rhyming_word = create_uri("W", str(last_word_index), l_index,
-                                        st_index,
-                                        author, poem_title, dataset)
+                                        st_index, author, poem_title, dataset)
             g.add((r_rhyme, METRICAL.hasRhymeWord, r_rhyming_word))
             r_rhyme_type = line["rhyme_type"]
             r_rtype = URIRef(KOS + slugify(r_rhyme_type))
             g.add((r_rhyme, METRICAL.presentsRhymeMatching, r_rtype))
             g.add((r_rtype, RDF.type, SKOS.concept))
-            # Gramatical List
+            word_count = 0  # Relative to Line
+            punct_count = 0
             for w_index, token in enumerate(line["tokens"]):
                 w_index = str(w_index)
-                if "word" not in token:
+                if "symbol" in token:
+                    r_punct = create_uri("P", str(punct_count), st_index,
+                                         author, poem_title, dataset)
+                    g.add((r_punctuation_list, METRICAL.punctuation, r_punct))
+                    if word_count > 0:
+                        r_prev_word = create_uri("W", word_count-1, l_index,
+                                                 st_index, author, poem_title,
+                                                 dataset)
+                        g.add((r_punct, METRICAL.after, r_prev_word))
+                    if int(w_index) != len(line["tokens"]):
+                        r_next_word = create_uri("W", word_count, l_index,
+                                                 st_index, author, poem_title,
+                                                 dataset)
+                        g.add((r_punct, METRICAL.before, r_next_word))
+                    punct_count += 1
                     continue
                 word_text = join_syllables(token)
-                r_word = create_uri("W", w_index, l_index, st_index,
+                r_word = create_uri("W", word_count, l_index, st_index,
                                     author, poem_title, dataset)
                 # Add word type
                 g.add((r_word, RDF.type, METRICAL.Word))
@@ -257,11 +287,8 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                 g.add((r_word_list, METRICAL.word, r_word))
                 # Add Word DP
                 g.add((r_word, METRICAL.content, Literal(word_text, lang="es")))
-                g.add((r_word, METRICAL.indexInLine,
-                       Literal(w_index, datatype=XSD.nonNegativeInteger)))
                 g.add((r_word, METRICAL.wordNumber,
                        Literal(word_count, datatype=XSD.nonNegativeInteger)))
-                # first last previous next Word
                 if int(w_index) == 0:
                     g.add((r_word_list, METRICAL.firstWord, r_word))
                 else:
@@ -276,21 +303,19 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                     g.add((r_word, METRICAL.nextWord,
                            create_uri("W", str(netx_w_index), l_index, st_index,
                                       author, poem_title, dataset)))
+                # Gramatical List
                 for sy_index, syllable in enumerate(token['word']):
                     sy_index = str(sy_index)
-                    r_syllable = create_uri("SY", sy_index,
-                                            w_index, l_index,
-                                            st_index, author,
-                                            poem_title, dataset)
+                    r_syllable = create_uri("SY", sy_index, w_index, l_index,
+                                            st_index, author, poem_title,
+                                            dataset)
                     # Add Syllable type
                     g.add((r_syllable, RDF.type, METRICAL.GrammaticalSyllable))
                     # Add Syllable to word
                     g.add((r_word, METRICAL.hasGrammaticalSyllable, r_syllable))
                     g.add((r_grammatical_list, METRICAL.syllable, r_syllable))
+                    # TODO: add MetricalSyllable `analyses` GrammaticalSyllable
                     # Add Syllable DP
-                    g.add((r_syllable, METRICAL.indexInWord,
-                           Literal(sy_index,
-                                   datatype=XSD.nonNegativeInteger)))
                     g.add((r_syllable, METRICAL.grammaticalSyllableNumber,
                            Literal(syllable_count,
                                    datatype=XSD.nonNegativeInteger)))
@@ -307,11 +332,9 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                     elif int(sy_index) != 0:
                         prev_sy_index = int(sy_index) - 1
                         g.add((r_syllable, METRICAL.previousGrammaticalSyllable,
-                               create_uri("SY", str(prev_sy_index),
-                                          w_index, l_index,
-                                          st_index, author,
-                                          poem_title, dataset)))
-                        print(syllable["syllable"], sy_index)
+                               create_uri("SY", str(prev_sy_index), w_index,
+                                          l_index, st_index, author, poem_title,
+                                          dataset)))
                     if int(w_index) + 1 == len(line["tokens"]) and int(
                         sy_index) + 1 == len(token["word"]):
                         g.add((r_grammatical_list,
@@ -319,10 +342,9 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                     else:
                         next_sy_index = int(sy_index) + 1
                         g.add((r_line, METRICAL.nextLine,
-                               create_uri("SY", str(next_sy_index),
-                                          w_index, l_index,
-                                          st_index, author,
-                                          poem_title, dataset)))
+                               create_uri("SY", str(next_sy_index), w_index,
+                                          l_index, st_index, author, poem_title,
+                                          dataset)))
                     syllable_count += 1
                 word_count += 1
             line_count += 1
@@ -339,6 +361,7 @@ def join_lines(stanza):
 
 def join_tokens(tokens):
     """Join all words from a list of tokens into a string.
+
     :param tokens: List of dictionaries representing tokens
     :return: String of words
     """
@@ -350,7 +373,8 @@ def join_tokens(tokens):
 
 
 def join_syllables(token):
-    """Join all symbols and syllables from a list of tokens into a string."
+    """Join all symbols and syllables from a list of tokens into a string.
+
     :param token: List of dictionaries representing tokens
     :return: String of syllables
     """
