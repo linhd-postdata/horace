@@ -2,7 +2,7 @@
 import os
 import json
 from rdflib import Graph, Namespace, RDF, Literal, XSD, RDFS
-from horace.utils import create_uri, NAMESPACES, URIRef, slugify
+from utils import create_uri, NAMESPACES, URIRef, slugify
 
 
 CORE = Namespace("http://postdata.linhd.uned.es/ontology/postdata-core#")

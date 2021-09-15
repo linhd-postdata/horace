@@ -1,7 +1,7 @@
 from rantanplan.core import format_stress
 from rdflib import Graph, RDF, Namespace, Literal, XSD, URIRef, RDFS
 
-from .utils import create_uri, slugify, NAMESPACES
+from utils import create_uri, slugify, NAMESPACES
 import time
 
 METRICAL = Namespace(NAMESPACES["pdm"])

@@ -1,6 +1,6 @@
 import os
-from horace.core import add_core_elements
-from horace.metrical import add_metrical_elements, add_rantanplan_elements
+from core import add_core_elements
+from metrical import add_metrical_elements, add_rantanplan_elements
 from rantanplan import get_scansion
 import json
 import sys
@@ -100,6 +100,7 @@ def main(argv):
         elif opt in ("-o", "--ofold"):
             outputfolder = arg
 
+        print("L", inputfolder, outputfolder)
         generate(inputfolder, outputfolder)
 
 
