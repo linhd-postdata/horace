@@ -3,6 +3,8 @@ from horace.core import add_core_elements
 from horace.metrical import add_metrical_elements, add_rantanplan_elements
 from rantanplan import get_scansion
 import json
+import sys
+import getopt
 
 
 def generate(corpora_root, rdf_root):
@@ -63,6 +65,7 @@ def generate(corpora_root, rdf_root):
 
 
 def query():
+    """Not used"""
     import requests
     from requests.auth import HTTPBasicAuth
 
@@ -80,4 +83,26 @@ def query():
     results = get.content
     print(results)
 
-generate("/home/uned/POSTDATA/corpora/", "/home/uned/POSTDATA/KG/")
+
+def main(argv):
+    inputfolder = ''
+    # The input folder that has as subfolders for each dataset downloaded by averell
+    # "/home/uned/POSTDATA/corpora/"
+    outputfolder = ''
+    # "/home/uned/POSTDATA/KG/"
+    try:
+        opts, args = getopt.getopt(argv, "i:o:", ["ifold=", "ofold="])
+    except getopt.GetoptError:
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-i", "--ifold"):
+            inputfolder = arg
+        elif opt in ("-o", "--ofold"):
+            outputfolder = arg
+
+        generate(inputfolder, outputfolder)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+    # generate("/home/uned/POSTDATA/corpora/", "/home/uned/POSTDATA/KG/")
