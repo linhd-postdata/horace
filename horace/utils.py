@@ -25,6 +25,6 @@ def create_uri(*uri_data) -> URIRef:
     :return: URIRef object representing the resource
     :rtype: :class:`rdflib.URIRef`
     """
-    print(uri_data)
+    # print(uri_data)
     pd_uri = "_".join([slugify(token) for token in uri_data])
     return URIRef(f"{NAMESPACES['pd']}{pd_uri}")

@@ -1,6 +1,7 @@
 import os
 from horace.core import add_core_elements
-from horace.metrical import add_metrical_elements
+from horace.metrical import add_metrical_elements, add_rantanplan_elements
+from rantanplan import get_scansion
 import json
 
 
@@ -11,26 +12,54 @@ def generate(corpora_root, rdf_root):
     datasets = os.listdir(base_root)
     print(datasets)
 
+    spanish_datasets = ["disco2_1", "disco3", "adso", "adso100", "plc", "gongo"]
+    all_datasets = spanish_datasets + ["fbfv", "ecpa"]
+
     for dataset in datasets:
-        print(dataset)
-        jsons_root = base_root + dataset + "/averell/parser"
-        authors = os.listdir(jsons_root)
-        print(authors)
-        for author in [a for a in authors if os.path.isdir(jsons_root + "/" + a)]:
-            json_files = os.listdir(jsons_root + "/" + author)
-            for json_file in json_files:
-                if json_file[-5:] == ".json":
-                    total_jsons.update({json_file[:-5]: jsons_root + "/" + author + "/" + json_file})
+        if dataset in all_datasets:
+            print(dataset)
+            jsons_root = base_root + dataset + "/averell/parser"
+            authors = os.listdir(jsons_root)
+            print(authors)
+            for author in [a for a in authors if os.path.isdir(jsons_root + "/" + a)]:
+                json_files = os.listdir(jsons_root + "/" + author)
+                for json_file in json_files:
+                    if json_file[-5:] == ".json":
+                        total_jsons.update({json_file[:-5]: jsons_root + "/" + author + "/" + json_file})
 
     n_doc = 0
     for name, root in total_jsons.items():
         n_doc += 1
-        print(name, root, n_doc)
-        rdf = add_core_elements(json.load(open(root)))
-        rdf = rdf + add_metrical_elements(json.load(open(root)))
+
+        _json = json.load(open(root))
+
+        rdf = add_core_elements(_json)
+        rdf = rdf + add_metrical_elements(_json)
+
+        poem_text = "\n\n".join([stanza["stanza_text"] for stanza in _json["stanzas"]])
+        poem_title = _json["poem_title"]
+        author = _json["author"]
+        dataset = _json["corpus"]
+
+        if dataset in spanish_datasets:
+            scansion = None
+            try:
+                scansion = get_scansion(poem_text, rhyme_analysis=True, rhythm_format="pattern",
+                     rhythmical_lengths=None, split_stanzas_on=r"\n\n",
+                     pos_output=False, always_return_rhyme=True)
+            except:
+                print("Rantanplan Error", " -- ", poem_title, "--", author, "--", dataset)
+                pass
+            if scansion is not None:
+                # print(scansion)
+                rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset)
+                # print("Rantanplan OK", " -- ", poem_title, "--", author,
+                #       "--", dataset)
+
         # rdf.serialize("/home/uned/POSTDATA/KG/poem_" + str(n_doc) + ".ttl", format="ttl")
         rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".ttl",
                       format="ttl")
+        print("PARSED TO RDF #", n_doc, "---", name, root)
 
 
 def query():
@@ -51,4 +80,4 @@ def query():
     results = get.content
     print(results)
 
-generate("./corpora/", "./kg/")
+generate("/home/uned/POSTDATA/corpora/", "/home/uned/POSTDATA/KG/")

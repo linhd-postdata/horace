@@ -46,19 +46,34 @@ def add_core_elements(_json):
 
     # Object Properties for mandatory resources
     graph.add((r_poetic_work, CORE.isRealisedThrough, r_redaction))
+    graph.add((r_redaction, CORE.realises, r_poetic_work))
+
     graph.add((r_work_conception, CORE.initiated, r_poetic_work))
+    graph.add((r_poetic_work, CORE.wasInitiatedBy, r_work_conception))
+
     graph.add((r_work_conception, CORE.hasAgentRole, r_agent_role))
+    graph.add((r_agent_role, CORE.isAgentRoleOf, r_work_conception))
+
     graph.add((r_agent_role, CORE.hasAgent, r_person))
+    graph.add((r_person, CORE.isAgentOf, r_agent_role))
+
     graph.add((r_agent_role, CORE.roleFunction, KOS.Creator))
 
     # Key for year : year
     # Add year of poetic work conception
     if "year" in _json.keys():
         work_date = _json["year"]
-        r_conception_date = create_uri("D", author, poem_title)
-        graph.add((r_conception_date, RDF.type, CORE.DateEntity))  # Time-Span
-        graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.date)))
-        graph.add((r_work_conception, CORE.hasDateEntity, r_conception_date))
+        if work_date is not None:
+            r_conception_date = create_uri("D", author, poem_title)
+            graph.add(
+                (r_conception_date, RDF.type, CORE.TimeSpan))
+            if work_date.isdigit():
+                graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.date)))
+            else:
+                graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.string)))
+
+            graph.add((r_work_conception, CORE.hasTimeSpan, r_conception_date))
+            # graph.add((r_work_conception, CORE.isTimeSpanOf, r_conception_date))
 
     # Key for alt title : poem_alt_title
     # Add alternative poetic work title
