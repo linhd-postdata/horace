@@ -623,7 +623,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                                  dataset)
                     g.add((r_metsyll, METRICAL.nextMetricalSyllable, r_next_met_syll))
 
-                if all_gram_syllables_index < metsyll_list_length - 1:
+                # if all_gram_syllables_index < metsyll_list_length - 1:
                     if not all_gram_syllables[all_gram_syllables_index]["synalepha"]:
                         r_gram_syll = create_uri("GSY", str(all_gram_syllables_index),
                                                  str(all_gram_syllables[all_gram_syllables_index]["w_number"]),

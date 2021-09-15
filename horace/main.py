@@ -53,10 +53,12 @@ def generate(corpora_root, rdf_root):
                 print("Rantanplan Error", " -- ", poem_title, "--", author, "--", dataset)
                 pass
             if scansion is not None:
-                # print(scansion)
-                rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset)
-                # print("Rantanplan OK", " -- ", poem_title, "--", author,
-                #       "--", dataset)
+                try:
+                    rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset)
+                except:
+                    print("Horace error parsing ", poem_title, "--", author, "--", dataset)
+                    pass
+                # print("PARSED", " -- ", poem_title, "--", author,
 
         # rdf.serialize("/home/uned/POSTDATA/KG/poem_" + str(n_doc) + ".ttl", format="ttl")
         rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".ttl",
