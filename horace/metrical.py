@@ -535,7 +535,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                    datatype=XSD.string)))
                     g.add((r_syllable, METRICAL.isStressed,
                            Literal(syllable["is_stressed"],
-                                   datatype=XSD.Boolean)))
+                                   datatype=XSD.boolean)))
                     # first last previous next Gram Syllable
                     if int(sy_index) == 0 and word_count == 0:
                         g.add((r_grammatical_list,
@@ -597,7 +597,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                 # Add DP - Stress and number
                 g.add((r_metsyll, METRICAL.isStressed,
                        Literal(msyl["is_stressed"],
-                               datatype=XSD.Boolean)))
+                               datatype=XSD.boolean)))
                 g.add((r_metsyll, METRICAL.metricalSyllableNumber,
                        Literal(msyl_index,
                                datatype=XSD.nonNegativeInteger)
