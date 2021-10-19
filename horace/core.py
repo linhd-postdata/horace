@@ -41,8 +41,8 @@ def add_core_elements(_json):
     graph.add((r_work_conception, RDF.type, CORE.WorkConception))
 
     # Data Properties for mandatory resources
-    graph.add((r_poetic_work, CORE.title, Literal(poem_title, lang="es")))
-    graph.add((r_person, CORE.name, Literal(author, lang="es")))
+    graph.add((r_poetic_work, CORE.title, Literal(poem_title)))
+    graph.add((r_person, CORE.name, Literal(author)))
 
     # Object Properties for mandatory resources
     graph.add((r_poetic_work, CORE.isRealisedThrough, r_redaction))
@@ -58,6 +58,7 @@ def add_core_elements(_json):
     graph.add((r_person, CORE.isAgentOf, r_agent_role))
 
     graph.add((r_agent_role, CORE.roleFunction, KOS.Creator))
+    graph.add((KOS.Creator, RDFS.label, Literal("Creator", lang="en")))
 
     # Key for year : year
     # Add year of poetic work conception
@@ -68,12 +69,13 @@ def add_core_elements(_json):
             graph.add(
                 (r_conception_date, RDF.type, CORE.TimeSpan))
             if work_date.isdigit():
+                # Todo > Distinguish DPs or distinguish classes (date, textualDate VS period, timePoint)
                 graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.date)))
             else:
                 graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.string)))
 
             graph.add((r_work_conception, CORE.hasTimeSpan, r_conception_date))
-            # graph.add((r_work_conception, CORE.isTimeSpanOf, r_conception_date))
+            graph.add((r_conception_date, CORE.isTimeSpanOf, r_work_conception))
 
     # Key for alt title : poem_alt_title
     # Add alternative poetic work title
@@ -89,4 +91,10 @@ def add_core_elements(_json):
         graph.add((r_poetic_work, CORE.genre, r_genre))
         graph.add((r_genre, RDFS.label, Literal(genre)))
 
+    # Add textual content
+    if "stanzas" in _json.keys():
+        print("LEN", len([stanza["stanza_text"] for stanza in _json["stanzas"]]))
+        text = "\n\n".join(stanza["stanza_text"] for stanza in _json["stanzas"])
+        graph.add((r_redaction, CORE.text, Literal(text)))
+        print(text)
     return graph

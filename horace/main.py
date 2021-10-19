@@ -1,6 +1,6 @@
 import os
 from core import add_core_elements
-from metrical import add_metrical_elements, add_rantanplan_elements
+from poetic import add_metrical_elements, add_rantanplan_elements
 from rantanplan import get_scansion
 import json
 import sys
@@ -49,6 +49,7 @@ def generate(corpora_root, rdf_root):
                 scansion = get_scansion(poem_text, rhyme_analysis=True, rhythm_format="pattern",
                      rhythmical_lengths=None, split_stanzas_on=r"\n\n",
                      pos_output=False, always_return_rhyme=True)
+                # print(scansion)
             except:
                 print("Rantanplan Error", " -- ", poem_title, "--", author, "--", dataset)
                 pass
@@ -60,10 +61,10 @@ def generate(corpora_root, rdf_root):
                     pass
                 # print("PARSED", " -- ", poem_title, "--", author,
 
-        # rdf.serialize("/home/uned/POSTDATA/KG/poem_" + str(n_doc) + ".ttl", format="ttl")
         rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".ttl",
-                      format="ttl")
-        print("PARSED TO RDF #", n_doc, "---", name, root)
+                      format="ttl", encoding="utf-8")
+        if n_doc % 300 == 0:
+            print("PARSED TO RDF #", n_doc, "--- Last poem -> ", name, root)
 
 
 def query():
@@ -102,8 +103,8 @@ def main(argv):
         elif opt in ("-o", "--ofold"):
             outputfolder = arg
 
-        print("L", inputfolder, outputfolder)
-        generate(inputfolder, outputfolder)
+    print("L", inputfolder, outputfolder)
+    generate(inputfolder, outputfolder)
 
 
 if __name__ == "__main__":

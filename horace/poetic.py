@@ -4,7 +4,7 @@ from rdflib import Graph, RDF, Namespace, Literal, XSD, URIRef, RDFS
 from utils import create_uri, slugify, NAMESPACES
 import time
 
-METRICAL = Namespace(NAMESPACES["pdm"])
+POETIC = Namespace(NAMESPACES["pdp"])
 CORE = Namespace("http://postdata.linhd.uned.es/ontology/postdata-core#")
 KOS = Namespace("http://postdata.linhd.uned.es/kos/")
 SKOS = Namespace(NAMESPACES["skos"])
@@ -16,6 +16,9 @@ def add_metrical_elements(_json) -> Graph:
     author = _json["author"]
     dataset = _json["corpus"]
 
+    f_time = str(time.time())
+    stamp = f_time[0:10] + f_time[11:]
+
     # Redaction resource
     r_redaction = create_uri("R", author, poem_title, dataset)
     g.add((r_redaction, RDF.type, CORE.Redaction))
@@ -23,54 +26,67 @@ def add_metrical_elements(_json) -> Graph:
     if "stanzas" in _json.keys():
         # Add stanza list
         r_stanza_list = create_uri("SL", poem_title, author, dataset)
-        g.add((r_stanza_list, RDF.type, METRICAL.StanzaList))
+        g.add((r_stanza_list, RDF.type, POETIC.StanzaList))
         # Add stanza list to redaction
-        g.add((r_redaction, METRICAL.hasStanzaList, r_stanza_list))
+        g.add((r_redaction, POETIC.hasStanzaList, r_stanza_list))
+        g.add((r_stanza_list, POETIC.isStanzaListof, r_redaction))
         # Add manual annotation event
-        r_event_scansion = create_uri("MSC", author, poem_title, dataset)
-        g.add((r_event_scansion, RDF.type, METRICAL.Scansion))
+        r_event_scansion = create_uri("SP", author, poem_title, dataset, stamp)
+        g.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
+        # Add scansion class
+        r_scansion = create_uri("SC", author, poem_title, dataset, stamp)
+        g.add((r_scansion, RDF.type, POETIC.Scansion))
+        # Scansion used redaction
+        g.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
+        g.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
+        # Scansion event generated scansion
+        g.add((r_event_scansion, POETIC.generated, r_scansion))
+        g.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
+        # TODO- Include the agent of the manual annotation
+        # Type of scansion
         r_concept_manual_scansion = URIRef(KOS + slugify("ManualAnnotation"))
-        g.add((r_event_scansion, METRICAL.employed, r_concept_manual_scansion))
-        # Add stanza list to scansion
-        g.add((r_event_scansion, METRICAL.generated, r_stanza_list))
-
-        # Add line list
-        r_line_list = create_uri("LL", poem_title, author, dataset)
-        g.add((r_line_list, RDF.type, METRICAL.LineList))
-        g.add((r_redaction, METRICAL.hasLineList, r_line_list))
-        # Add line list to scansion event
-        g.add((r_event_scansion, METRICAL.generated, r_line_list))
+        g.add((r_scansion, POETIC.typeOfScansion, r_concept_manual_scansion))
+        g.add((r_concept_manual_scansion, RDFS.label, Literal("Manual Annotation", lang="en")))
+        # Include stanza list to scansion
+        g.add((r_scansion, POETIC.hasListAnnotation, r_stanza_list))
+        g.add((r_stanza_list, POETIC.isListAnnotatedBy, r_scansion))
+        # Include stanza list to redaction
+        g.add((r_redaction, POETIC.hasStanzaList, r_stanza_list))
+        g.add((r_stanza_list, POETIC.isStanzaListOf, r_redaction))
 
         n_absolute_lines = 0
         for st_i, stanza in enumerate(_json["stanzas"]):
             stanza_number = str(stanza["stanza_number"])
             stanza_text = stanza["stanza_text"]
 
+            # Create stanza
             r_stanza = create_uri("ST", stanza_number, author, poem_title, dataset)
             # Add Stanza Type
-            g.add((r_stanza, RDF.type, METRICAL.Stanza))
+            g.add((r_stanza, RDF.type, POETIC.Stanza))
             # Add Stanza to stanza list
-            g.add((r_stanza_list, METRICAL.stanza, r_stanza))
+            g.add((r_stanza_list, POETIC.stanza, r_stanza))
+            g.add((r_stanza, POETIC.stanzaList, r_stanza_list))
             # Add Stanza to redaction
-            g.add((r_redaction, METRICAL.hasStanza, r_stanza))
+            g.add((r_redaction, POETIC.hasStanza, r_stanza))
+            g.add((r_stanza, POETIC.isStanzaOf, r_redaction))
 
+            # First, last, next, previous
             if st_i == 0:
-                g.add((r_stanza_list, METRICAL.firstStanza, r_stanza))
-                g.add((r_redaction, METRICAL.hasFirstStanza, r_stanza))
+                g.add((r_stanza_list, POETIC.firstStanza, r_stanza))
+                g.add((r_stanza, POETIC.firstStanzaOf, r_stanza_list))
             elif st_i == len(_json["stanzas"]) - 1:
-                g.add((r_stanza, METRICAL.lastStanza, r_stanza))
-                g.add((r_redaction, METRICAL.hasLastStanza, r_stanza))
-
+                g.add((r_stanza_list, POETIC.lastStanza, r_stanza))
+                g.add((r_stanza, POETIC.lastStanzaOf, r_stanza_list))
             if st_i < len(_json["stanzas"]) - 2:
                 next_st = create_uri("ST", str(st_i + 1), author, poem_title, dataset)
-                g.add((r_stanza, METRICAL.nextStanza, next_st))
+                g.add((r_stanza, POETIC.nextStanza, next_st))
             if st_i > 0:
                 prev_st = create_uri("ST", str(st_i - 1), author, poem_title, dataset)
-                g.add((r_stanza, METRICAL.previousStanza, prev_st))
+                g.add((r_stanza, POETIC.previousStanza, prev_st))
 
             # Add Stanza DP
-            g.add((r_stanza, METRICAL.content, Literal(stanza_text, lang="es")))
-            g.add((r_stanza, METRICAL.stanzaNumber,
+            g.add((r_stanza, POETIC.content, Literal(stanza_text)))
+            g.add((r_stanza, POETIC.stanzaNumber,
                    Literal(stanza_number, datatype=XSD.nonNegativeInteger)))
 
             # Check for Stanza type
@@ -79,14 +95,17 @@ def add_metrical_elements(_json) -> Graph:
                 if stanza["stanza_type"] is not None:
                     s_type = stanza["stanza_type"]
                     r_stype = URIRef(KOS + slugify(s_type))
-                    g.add((r_stanza, METRICAL.typeOfStanza, r_stype))
+                    g.add((r_stanza, POETIC.typeOfStanza, r_stype))
                     g.add((r_stype, RDFS.label, Literal(s_type)))
 
             if "lines" in stanza.keys():
-                # Add line list to scansion event
-                g.add((r_line_list, RDF.type, METRICAL.LineList))
-                g.add((r_event_scansion, METRICAL.generated, r_line_list))
-                g.add((r_redaction, METRICAL.hasLineList, r_line_list))
+                # Create line list
+                r_line_list = create_uri("LL", poem_title, author, dataset, str(st_i))
+                # Add LineList type
+                g.add((r_line_list, RDF.type, POETIC.LineList))
+                # Add line list to scansion
+                g.add((r_scansion, POETIC.hasListAnnotation, r_line_list))
+                g.add((r_line_list, POETIC.isListAnnotationOf, r_scansion))
 
                 for l_i, line in enumerate(stanza["lines"]):
                     line_number = str(line["line_number"])
@@ -95,37 +114,34 @@ def add_metrical_elements(_json) -> Graph:
                     r_line = create_uri("L", line_number, stanza_number, author, poem_title,
                                           dataset)
                     # Add line type
-                    g.add((r_line, RDF.type, METRICAL.Line))
+                    g.add((r_line, RDF.type, POETIC.Line))
                     # Add line to stanza
-                    g.add((r_stanza, METRICAL.hasLine, r_line))
+                    g.add((r_stanza, POETIC.hasLine, r_line))
+                    g.add((r_line, POETIC.isLineOf, r_stanza))
                     # Add line to line list
-                    g.add((r_line_list, METRICAL.line, r_line))
+                    g.add((r_line_list, POETIC.line, r_line))
+                    g.add((r_line, POETIC.lineList, r_line_list))
 
                     if l_i == 0:
-                        g.add((r_stanza, METRICAL.hasFirstLine, r_line))
+                        g.add((r_line_list, POETIC.firstLine, r_line))
+                        g.add((r_line, POETIC.firstLineOf, r_line_list))
                     elif l_i == len(stanza["lines"]) - 1:
-                        g.add((r_stanza, METRICAL.hasLastLine, r_line))
-
-                    if n_absolute_lines == 0:
-                        g.add((r_line_list, METRICAL.firstLine, r_line))
-                    elif st_i == len(_json["stanzas"]) - 1 and\
-                        l_i == len(stanza["lines"]) - 1:
-                        g.add((r_line_list, METRICAL.lastLine, r_line))
-
+                        g.add((r_line_list, POETIC.lastLine, r_line))
+                        g.add((r_line, POETIC.lastLineOf, r_line_list))
                     if st_i < len(stanza["lines"]) - 2:
                         next_l = create_uri("L", str(l_i + 1), stanza_number, author, poem_title,
                                           dataset)
-                        g.add((r_line, METRICAL.nextLine, next_l))
+                        g.add((r_line, POETIC.nextLine, next_l))
                     if st_i > 0:
                         prev_l = create_uri("L", str(l_i - 1), stanza_number, author, poem_title,
                                           dataset)
-                        g.add((r_line, METRICAL.previousLine, prev_l))
+                        g.add((r_line, POETIC.previousLine, prev_l))
 
                     # Add line DP
-                    g.add((r_line, METRICAL.content, Literal(line_text, lang="es")))
-                    g.add((r_line, METRICAL.relativeLineNumber,
+                    g.add((r_line, POETIC.content, Literal(line_text)))
+                    g.add((r_line, POETIC.relativeLineNumber,
                            Literal(line_number, datatype=XSD.nonNegativeInteger)))
-                    g.add((r_line, METRICAL.absoluteLineNumber,
+                    g.add((r_line, POETIC.absoluteLineNumber,
                            Literal(n_absolute_lines, datatype=XSD.nonNegativeInteger)))
 
                     n_absolute_lines += 1
@@ -133,11 +149,14 @@ def add_metrical_elements(_json) -> Graph:
                     if "words" in line.keys():
                         # Create word list
                         r_word_list = create_uri("WL", stanza_number, line_number, author, poem_title, dataset)
-                        g.add((r_word_list, RDF.type, METRICAL.WordList))
+                        g.add((r_word_list, RDF.type, POETIC.WordList))
                         # Add Word list to line
-                        g.add((r_line, METRICAL.hasWordList, r_word_list))
+                        g.add((r_line, POETIC.hasWordList, r_word_list))
+                        g.add((r_word_list, POETIC.isWordListOf, r_line))
                         # Add Word List to scansion
-                        g.add((r_event_scansion, METRICAL.generated, r_word_list))
+                        g.add((r_scansion, POETIC.hasListAnnotation, r_word_list))
+                        g.add((r_word_list, POETIC.isListAnnotationOf,
+                               r_scansion))
 
                         for w_i, word in enumerate(line["words"]):
                             word_number = str(w_i)
@@ -146,42 +165,47 @@ def add_metrical_elements(_json) -> Graph:
                             r_word = create_uri("W", word_number, line_number, stanza_number,
                                                   author, poem_title, dataset)
                             # Add word type
-                            g.add((r_word, RDF.type, METRICAL.Word))
+                            g.add((r_word, RDF.type, POETIC.Word))
                             # Add line to word
-                            g.add((r_line, METRICAL.hasWord, r_word))
+                            g.add((r_line, POETIC.hasWord, r_word))
+                            g.add((r_word, POETIC.isWordOf, r_line))
                             # Add Word DP
-                            g.add((r_word, METRICAL.content, Literal(word_text, lang="es")))
-                            g.add((r_word, METRICAL.wordNumber,
+                            g.add((r_word, POETIC.content, Literal(word_text)))
+                            g.add((r_word, POETIC.wordNumber,
                                    Literal(word_number, datatype=XSD.nonNegativeInteger)))
 
                             # Add Word to word list
-                            g.add((r_word_list, METRICAL.word, r_word))
+                            g.add((r_word_list, POETIC.word, r_word))
+                            g.add((r_word, POETIC.wordList, r_word_list))
 
                             if w_i == 0:
-                                g.add((r_word_list, METRICAL.firstWord, r_word))
-                                g.add((r_line, METRICAL.hasFirstWord, r_word))
+                                g.add((r_word_list, POETIC.firstWord, r_word))
+                                g.add((r_word, POETIC.firstWordOf, r_word_list))
                             elif w_i == len(line["words"]) - 1:
-                                g.add((r_word_list, METRICAL.LastWord, r_word))
-                                g.add((r_line, METRICAL.hasLastWord, r_word))
+                                g.add((r_word_list, POETIC.lastWord, r_word))
+                                g.add((r_word, POETIC.lastWordOf, r_word_list))
 
                             if l_i < len(line["words"]) - 2:
                                 next_word = create_uri("W", word_number, str(l_i + 1), stanza_number,
                                                   author, poem_title, dataset)
-                                g.add((r_word, METRICAL.nextWord, next_word))
+                                g.add((r_word, POETIC.nextWord, next_word))
                             if l_i > 0:
                                 prev_word = create_uri("W", word_number, str(l_i - 1), stanza_number,
                                 author, poem_title, dataset)
                                 g.add(
-                                    (r_word, METRICAL.previousWord, prev_word))
+                                    (r_word, POETIC.previousWord, prev_word))
 
                             if "syllables" in word.keys():
                                 # Create syllable list
                                 r_syllable_list = create_uri("GSL", stanza_number, line_number, author, poem_title, dataset)
-                                g.add((r_syllable_list, RDF.type, METRICAL.GrammaticalSyllableList))
-                                # Add Syllable List to line
-                                g.add((r_line, METRICAL.hasGrammaticalSyllableList, r_syllable_list))
+                                g.add((r_syllable_list, RDF.type, POETIC.GrammaticalSyllableList))
+                                # Add Syllable List to Line
+                                g.add((r_line, POETIC.hasGrammaticalSyllableList, r_syllable_list))
+                                g.add((r_syllable_list,
+                                       POETIC.isGrammaticalSyllableListOf,
+                                       r_line))
                                 # Add Syllable List to Scansion
-                                g.add((r_event_scansion, METRICAL.generated, r_syllable_list))
+                                g.add((r_scansion, POETIC.hasListAnnotation, r_syllable_list))
 
                                 for s_i, syllable in enumerate(word["syllables"]):
                                     syllable_number = str(s_i)
@@ -190,37 +214,43 @@ def add_metrical_elements(_json) -> Graph:
                                                                   stanza_number, author,
                                                                   poem_title, dataset)
                                     # Add Syllable type
-                                    g.add((r_syllable, RDF.type, METRICAL.GrammaticalSyllable))
+                                    g.add((r_syllable, RDF.type, POETIC.GrammaticalSyllable))
                                     # Add Syllable to word
-                                    g.add((r_word, METRICAL.hasGrammaticalSyllable, r_syllable))
+                                    g.add((r_word, POETIC.hasGrammaticalSyllable, r_syllable))
+                                    g.add((r_syllable,
+                                           POETIC.isGrammaticalSyllableOf,
+                                           r_syllable))
                                     # Add Syllable DP
-                                    g.add((r_syllable, METRICAL.syllableNumber,
+                                    g.add((r_syllable, POETIC.syllableNumber,
                                            Literal(syllable_number,
                                                    datatype=XSD.nonNegativeInteger)))
-                                    g.add((r_syllable, METRICAL.content, Literal(syllable,
-                                                                                 datatype=XSD.string)))
+                                    g.add((r_syllable, POETIC.content, Literal(syllable,
+                                                                               datatype=XSD.string)))
                                     # Add Syllable to list
-                                    g.add((r_syllable_list, METRICAL.grmmaticalSyllable, r_syllable))
+                                    g.add((r_syllable_list, POETIC.grmmaticalSyllable, r_syllable))
+                                    g.add((r_syllable,
+                                           POETIC.grmmaticalSyllableList,
+                                           r_syllable_list))
 
                                     if s_i == 0:
-                                        g.add((r_syllable_list, METRICAL.firstGrammaticalSyllable, r_syllable))
-                                        g.add((r_word, METRICAL.hasFirstSyllable, r_syllable))
+                                        g.add((r_syllable_list, POETIC.firstGrammaticalSyllable, r_syllable))
+                                        g.add((r_syllable, POETIC.firstGrammaticalSyllableOf, r_syllable_list))
                                     elif s_i == len(word["syllables"]) - 1:
-                                        g.add((r_syllable_list, METRICAL.lastGrammaticalSyllable, r_syllable))
-                                        g.add((r_word, METRICAL.hasLastSyllable, r_syllable))
+                                        g.add((r_syllable_list, POETIC.lastGrammaticalSyllable, r_syllable))
+                                        g.add((r_syllable, POETIC.lastGrammaticalSyllableOf, r_syllable_list))
 
                                     if s_i < len(word["syllables"]) - 2:
                                         next_syl = create_uri("GSY", str(s_i + 1),
                                                                   word_number, line_number,
                                                                   stanza_number, author,
                                                                   poem_title, dataset)
-                                        g.add((r_syllable, METRICAL.nextGrammaticalSyllable, next_syl))
+                                        g.add((r_syllable, POETIC.nextGrammaticalSyllable, next_syl))
                                     if s_i > 0:
                                         prev_syl = create_uri("GSY", str(s_i - 1),
                                                                   word_number, line_number,
                                                                   stanza_number, author,
                                                                   poem_title, dataset)
-                                        g.add((r_syllable, METRICAL.previousGrammaticalSyllable, prev_syl))
+                                        g.add((r_syllable, POETIC.previousGrammaticalSyllable, prev_syl))
 
     return g
 
@@ -246,36 +276,42 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
     f_time = str(time.time())
     stamp = f_time[0:10] + f_time[11:]
 
-    r_event_scansion = create_uri("ASC", author, poem_title, dataset, stamp)
-    g.add((r_event_scansion, RDF.type, METRICAL.Scansion))
-    r_concept_auto_scansion = URIRef(KOS + slugify("AutomaticScansion"))
-    g.add((r_event_scansion, METRICAL.employed, r_concept_auto_scansion))
-
+    # Create Scansion process
+    r_event_scansion = create_uri("SP", author, poem_title, dataset, stamp)
+    g.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
+    # Associate agent to scansion process
     r_rantanplan_agent = URIRef(KOS + slugify("Rantanplan"))
     g.add((r_rantanplan_agent, RDFS.label, Literal("Rantanplan v.0.6.0")))
     g.add((r_rantanplan_agent, RDFS.seeAlso,
            URIRef("https://github.com/linhd-postdata/rantanplan")))
-    g.add((r_event_scansion, CORE.hasAgent, r_rantanplan_agent))
-    g.add((r_rantanplan_agent, CORE.isAgentOf, r_event_scansion))
+    g.add((r_event_scansion, POETIC.hasAgent, r_rantanplan_agent))
+    g.add((r_rantanplan_agent, POETIC.isAgentOf, r_event_scansion))
+    # Scansion created by scansion process
+    r_scansion = create_uri("SC", author, poem_title, dataset, stamp)
+    g.add((r_scansion, RDF.type, POETIC.Scansion))
+    g.add((r_event_scansion, POETIC.generated, r_scansion))
+    g.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
+    # Type of scansion
+    r_concept_auto_scansion = URIRef(KOS + slugify("AutomaticScansion"))
+    g.add((r_scansion, POETIC.typeOfScansion, r_concept_auto_scansion))
 
     # Resources
     r_redaction = create_uri("R", author, poem_title, dataset)
     r_stanza_list = create_uri("SL", poem_title, author, dataset)
-    r_line_list = create_uri("LL", poem_title, author, dataset)
 
-    # Scansion generated
-    g.add((r_event_scansion, CORE.generated, r_stanza_list))
-    g.add((r_stanza_list, CORE.wasGeneratedBy, r_event_scansion))
-    g.add((r_event_scansion, CORE.generated, r_line_list))
-    g.add((r_line_list, CORE.wasGeneratedBy, r_event_scansion))
+    # Scansion used redaction
+    g.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
+    g.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
+    # Scansion generated stanza list
+    g.add((r_scansion, POETIC.hasListAnnotation, r_stanza_list))
+    g.add((r_stanza_list, POETIC.isListAnnotationOf, r_scansion))
 
     # Add types
     g.add((r_redaction, RDF.type, CORE.Redaction))
-    g.add((r_stanza_list, RDF.type, METRICAL.StanzaList))
-    g.add((r_line_list, RDF.type, METRICAL.LineList))
-    # Add lists to redaction
-    g.add((r_redaction, METRICAL.hasStanzaList, r_stanza_list))
-    g.add((r_redaction, METRICAL.hasLineList, r_line_list))
+    g.add((r_stanza_list, RDF.type, POETIC.StanzaList))
+    # Add stanza list to redaction
+    g.add((r_redaction, POETIC.hasStanzaList, r_stanza_list))
+    g.add((r_stanza_list, POETIC.isStanzaListOf, r_redaction))
 
     line_count = 0
     syllable_count = 0
@@ -289,44 +325,57 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
         r_stanza_pattern = create_uri("SP", st_index, author, poem_title,
                                       dataset)
         # Add Stanza Type
-        g.add((r_stanza, RDF.type, METRICAL.Stanza))
-        g.add((r_stanza_pattern, RDF.type, METRICAL.StanzaPattern))
+        g.add((r_stanza, RDF.type, POETIC.Stanza))
+        g.add((r_stanza_pattern, RDF.type, POETIC.StanzaPattern))
         # Add Stanza to StanzaList
-        g.add((r_stanza_list, METRICAL.stanza, r_stanza))
+        g.add((r_stanza_list, POETIC.stanza, r_stanza))
+        g.add((r_stanza, POETIC.stanzaList, r_stanza_list))
         # Add Stanza to redaction
-        g.add((r_redaction, METRICAL.hasStanza, r_stanza))
-        # Add first and last stanzas to redaction
-        if int(st_index) == 0:
-            g.add((r_redaction, METRICAL.hasFirstStanza, r_stanza))
-        if int(st_index) == len(scansion) - 1:
-            g.add((r_redaction, METRICAL.hasLastStanza, r_stanza))
+        g.add((r_redaction, POETIC.hasStanza, r_stanza))
+        g.add((r_stanza, POETIC.isStanzaOf, r_redaction))
 
         # Add StanzaPattern to Stanza
-        g.add((r_stanza, METRICAL.hasStanzaPattern, r_stanza_pattern))
+        g.add((r_stanza, POETIC.hasStanzaPattern, r_stanza_pattern))
+        g.add((r_stanza_pattern, POETIC.isStanzaPatternOf, r_stanza))
+        # Add StanzaPattern to Scansion
+        g.add((r_scansion, POETIC.hasPatternAnnotation, r_stanza_pattern))
+        g.add((r_stanza_pattern, POETIC.isPatternAnnotationOf, r_scansion))
 
         # Add Stanza DP
-        g.add((r_stanza, METRICAL.content, Literal(stanza_text, lang="es")))
-        g.add((r_stanza, METRICAL.stanzaNumber,
+        g.add((r_stanza, POETIC.content, Literal(stanza_text, lang="es")))
+        g.add((r_stanza, POETIC.stanzaNumber,
                Literal(st_index, datatype=XSD.nonNegativeInteger)))
-        # Add Stanza DP pattern
-        g.add((r_stanza_pattern, METRICAL.rhymeScheme,
+        # Add Stanza pattern DP
+        g.add((r_stanza_pattern, POETIC.rhymeScheme,
                Literal(get_rhyme_pattern(stanza))))
 
         # Add first and last stanzas to list - Previous and Next Stanzas
         if int(st_index) == 0:
-            g.add((r_stanza_list, METRICAL.firstStanza, r_stanza))
+            g.add((r_stanza_list, POETIC.firstStanza, r_stanza))
+            g.add((r_stanza, POETIC.firstStanzaoF, r_stanza_list))
         else:
             prev_st_index = int(st_index) - 1
-            g.add((r_stanza, METRICAL.previousStanza,
+            g.add((r_stanza, POETIC.previousStanza,
                    create_uri("ST", str(prev_st_index), author, poem_title,
                               dataset)))
         if int(st_index) + 1 == len(scansion):
-            g.add((r_stanza_list, METRICAL.lastStanza, r_stanza))
+            g.add((r_stanza_list, POETIC.lastStanza, r_stanza))
+            g.add((r_stanza, POETIC.lastStanzaOf, r_stanza_list))
         else:
             next_st_index = int(st_index) + 1
-            g.add((r_stanza, METRICAL.nextStanza,
+            g.add((r_stanza, POETIC.nextStanza,
                    create_uri("ST", str(next_st_index), author, poem_title,
                               dataset)))
+
+        # Create line list and add type
+        r_line_list = create_uri("LL", poem_title, author, dataset, str(st_index))
+        g.add((r_line_list, RDF.type, POETIC.LineList))
+        # Add line list to scansion
+        g.add((r_scansion, POETIC.hasListAnnotation, r_line_list))
+        g.add((r_line_list, POETIC.isListAnnotationOf, r_scansion))
+        # Add line list to stanza
+        g.add((r_stanza, POETIC.hasLineList, r_line_list))
+        g.add((r_line_list, POETIC.isLineListOf, r_stanza))
 
         # Iterate over lines
         for l_index, line in enumerate(stanza):
@@ -354,160 +403,178 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                         dataset)
 
             # Add types
-            g.add((r_line, RDF.type, METRICAL.Line))
-            g.add((r_word_list, RDF.type, METRICAL.WordList))
+            g.add((r_line, RDF.type, POETIC.Line))
+            g.add((r_word_list, RDF.type, POETIC.WordList))
             g.add((r_grammatical_list, RDF.type,
-                   METRICAL.GrammaticalSyllableList))
-            g.add((r_metrical_list, RDF.type, METRICAL.MetricalSyllableList))
-            g.add((r_line_pattern, RDF.type, METRICAL.LinePattern))
-
-            # Add line pattern to scansion
-            g.add((r_event_scansion, METRICAL.generated, r_line_pattern))
-            g.add((r_line_pattern, METRICAL.wasGeneratedBy, r_event_scansion))
+                   POETIC.GrammaticalSyllableList))
+            g.add((r_metrical_list, RDF.type, POETIC.MetricalSyllableList))
+            g.add((r_line_pattern, RDF.type, POETIC.LinePattern))
+            g.add((r_punctuation_list, RDF.type, POETIC.PunctuationList))
+            # Add patterns to scansion
+            g.add((r_scansion, POETIC.hasPatternAnnotation, r_line_pattern))
+            g.add((r_line_pattern, POETIC.isPatternAnnotationOf, r_scansion))
+            # Add lists to scansion
+            g.add((r_scansion, POETIC.hasListAnnotation, r_word_list))
+            g.add((r_word_list, POETIC.isListAnnotationOf, r_scansion))
+            g.add((r_scansion, POETIC.hasListAnnotation, r_punctuation_list))
+            g.add((r_punctuation_list, POETIC.isListAnnotationOf, r_scansion))
+            g.add((r_scansion, POETIC.hasListAnnotation, r_metrical_list))
+            g.add((r_metrical_list, POETIC.isListAnnotationOf, r_scansion))
+            g.add((r_scansion, POETIC.hasListAnnotation, r_grammatical_list))
+            g.add((r_grammatical_list, POETIC.isListAnnotationOf, r_scansion))
 
             # Add line to stanza - Add first and last lines to stanza
-            g.add((r_stanza, METRICAL.hasLine, r_line))
-            if int(l_index) == 0:
-                g.add((r_stanza, METRICAL.hasFirstLine, r_line))
-            if int(l_index) == len(stanza) - 1:
-                g.add((r_stanza, METRICAL.hasLastLine, r_line))
+            g.add((r_stanza, POETIC.hasLine, r_line))
+            g.add((r_line, POETIC.isLineOf, r_stanza))
 
             # Add line to line list
-            g.add((r_line_list, METRICAL.line, r_line))
+            g.add((r_line_list, POETIC.line, r_line))
+            g.add((r_line, POETIC.lineList, r_line_list))
             # Add lists to line
-            g.add((r_line, METRICAL.hasWordList, r_word_list))
-            g.add((r_line, METRICAL.hasGrammaticalSyllableList,
+            g.add((r_line, POETIC.hasWordList, r_word_list))
+            g.add((r_word_list, POETIC.isWordListOf, r_line))
+            g.add((r_line, POETIC.hasGrammaticalSyllableList,
                    r_grammatical_list))
-            g.add((r_line, METRICAL.hasMetricalSyllableList, r_metrical_list))
+            g.add((r_grammatical_list, POETIC.isGramamticalSyllableListOf,
+                   r_line))
+            g.add((r_line, POETIC.hasMetricalSyllableList, r_metrical_list))
+            g.add((r_metrical_list, POETIC.isMetricalSyllableListOf, r_line))
+
             # Add pattern to line
-            g.add((r_line, METRICAL.hasLinePattern, r_line_pattern))
+            g.add((r_line, POETIC.hasLinePattern, r_line_pattern))
+            g.add((r_line_pattern, POETIC.isLinePatternOf, r_line))
 
             # Add line DP indexes
-            g.add((r_line, METRICAL.relativeLineNumber,
+            g.add((r_line, POETIC.relativeLineNumber,
                    Literal(l_index, datatype=XSD.nonNegativeInteger)))
-            g.add((r_line, METRICAL.absoluteLineNumber,
+            g.add((r_line, POETIC.absoluteLineNumber,
                    Literal(str(line_count), datatype=XSD.nonNegativeInteger)))
             # Add metrical pattern to line pattern
-            g.add((r_line_pattern, METRICAL.patterningMetricalScheme,
+            g.add((r_line_pattern, POETIC.patterningMetricalScheme,
                    Literal(line["rhythm"]["stress"], datatype=XSD.string)))
             # Check for Stanza type
             if not structure and line.get("structure") is not None:
                 structure = line["structure"]
                 r_stype = URIRef(KOS + slugify(structure))
-                g.add((r_stanza_pattern, METRICAL.metricalType, r_stype))
+                g.add((r_stanza_pattern, POETIC.metricalType, r_stype))
                 g.add((r_stype, RDFS.label, Literal(structure)))
-
-                # Add stanza pattern to scansion
-                g.add((r_event_scansion, METRICAL.generated, r_stanza_pattern))
-                g.add((r_stanza_pattern, METRICAL.wasGeneratedBy, r_event_scansion))
 
             if "tokens" not in line:
                 continue
 
             # Add line text
             line_text = join_tokens(line["tokens"])
-            g.add((r_line, METRICAL.content, Literal(line_text, lang="es")))
+            g.add((r_line, POETIC.content, Literal(line_text)))
             # Add grammatical pattern to line pattern
-            g.add((r_line_pattern, METRICAL.grammaticalStressPattern,
+            g.add((r_line_pattern, POETIC.grammaticalStressPattern,
                    Literal(get_grammatical_stress_pattern(line["tokens"]),
                            datatype=XSD.string)))
 
             # Add first last lines to line list - Add previous next Line links
             if line_count == 0:
-                g.add((r_line_list, METRICAL.firstLine, r_line))
+                g.add((r_line_list, POETIC.firstLine, r_line))
+                g.add((r_line, POETIC.firstLineOf, r_line_list))
             else:
-                g.add((r_line, METRICAL.previousLine,
+                g.add((r_line, POETIC.previousLine,
                        create_uri("L", str(line_count - 1), st_index, author,
                                   poem_title,
                                   dataset)))
             if int(st_index) + 1 == len(scansion) and int(l_index) + 1 == len(stanza):
-                g.add((r_line_list, METRICAL.lastLine, r_line))
+                g.add((r_line_list, POETIC.lastLine, r_line))
+                g.add((r_line, POETIC.lastLineOf, r_line_list))
             else:
-                g.add((r_line, METRICAL.nextLine,
+                g.add((r_line, POETIC.nextLine,
                        create_uri("L", str(line_count + 1), st_index, author,
                                   poem_title, dataset)))
 
             # Add rhyme info - last Word of Line, add Rhyme to the Word URIRef
+            print("LINEA RHYME", line)
             rhyme_label = line["rhyme"]
             rhyme_ending = line["ending"]
             r_rhyme = create_uri("R", rhyme_label, author, poem_title, dataset)
-            g.add((r_rhyme, RDF.type, METRICAL.Rhyme))
-            g.add((r_rhyme, METRICAL.rhymeLabel, Literal(rhyme_label)))
-            g.add((r_rhyme, METRICAL.rhymeGrapheme, Literal(rhyme_ending)))
+            g.add((r_rhyme, RDF.type, POETIC.Rhyme))
+            g.add((r_rhyme, POETIC.rhymeLabel, Literal(rhyme_label)))
+            g.add((r_rhyme, POETIC.rhymeGrapheme, Literal(rhyme_ending)))
+            # Add line has rhyme and rhyme matching type - TODO
+            g.add((r_line, POETIC.hasRhyme, r_rhyme))
 
             # Get last word index
             last_word_index = get_last_word_index(line["tokens"])
             # Add rhyming words
             r_rhyming_word = create_uri("W", str(last_word_index), l_index,
                                         st_index, author, poem_title, dataset)
-            g.add((r_rhyme, METRICAL.hasRhymeWord, r_rhyming_word))
+            g.add((r_rhyme, POETIC.hasRhymeWord, r_rhyming_word))
             r_rhyme_type = line["rhyme_type"]
             r_rtype = URIRef(KOS + slugify(r_rhyme_type))
             # Add rhyme matching type
-            g.add((r_rhyme, METRICAL.presentsRhymeMatching, r_rtype))
+            g.add((r_rhyme, POETIC.presentsRhymeMatching, r_rtype))
             g.add((r_rtype, RDF.type, SKOS.concept))
+            g.add((r_rtype, RDFS.label, Literal(r_rhyme_type)))
+
             word_count = 0  # Relative to Line
             punct_count = 0
 
-            # Add Scansion generated word list
-            g.add((r_event_scansion, CORE.generated, r_word_list))
-            g.add((r_word_list, CORE.wasGeneratedBy, r_event_scansion))
-
             # Iterate over words
+            # TODO- Add punctuation content + next / previous
             for w_index, token in enumerate(line["tokens"]):
                 w_index = str(w_index)
                 if "symbol" in token:
                     r_punct = create_uri("P", str(punct_count), st_index,
                                          author, poem_title, dataset)
-                    g.add((r_punctuation_list, METRICAL.punctuation, r_punct))
+                    # Add punctuation to line
+                    g.add((r_line, POETIC.hasPunctuation, r_punct))
+                    g.add((r_punct, POETIC.isPunctuationOf, r_line))
+                    # Add punctuation to punctuation list
+                    g.add((r_punctuation_list, POETIC.punctuation, r_punct))
+                    g.add((r_punct, POETIC.punctuationList, r_punctuation_list))
                     if word_count > 0:
                         r_prev_word = create_uri("W", str(word_count-1), str(l_index),
                                                  str(st_index), author, poem_title,
                                                  dataset)
-                        g.add((r_punct, METRICAL.after, r_prev_word))
+                        g.add((r_punct, POETIC.after, r_prev_word))
                     if int(w_index) != len(line["tokens"]):
                         r_next_word = create_uri("W", str(word_count), str(l_index),
                                                  str(st_index), author, poem_title,
                                                  dataset)
-                        g.add((r_punct, METRICAL.before, r_next_word))
+                        g.add((r_punct, POETIC.before, r_next_word))
                     punct_count += 1
+                    g.add((r_punct, POETIC.content, Literal(token["symbol"])))
                     continue
                 word_text = join_syllables(token)
                 # Create word resource
                 r_word = create_uri("W", str(word_count), str(l_index), str(st_index),
                                     author, poem_title, dataset)
                 # Add word type
-                g.add((r_word, RDF.type, METRICAL.Word))
+                g.add((r_word, RDF.type, POETIC.Word))
                 # Add word to WordList
-                g.add((r_word_list, METRICAL.word, r_word))
+                g.add((r_word_list, POETIC.word, r_word))
+                g.add((r_word, POETIC.wordList, r_word_list))
                 # Add word to Line
-                g.add((r_line, METRICAL.hasWord, r_word))
-                if int(w_index) == 0:
-                    g.add((r_line, METRICAL.hasFirstWord, r_word))
-                if int(w_index) == len(line["tokens"]) - 1:
-                    g.add((r_line, METRICAL.hasLastWord, r_word))
+                g.add((r_line, POETIC.hasWord, r_word))
+                g.add((r_word, POETIC.isWordOf, r_line))
+
                 # Add Word DP
-                g.add((r_word, METRICAL.content, Literal(word_text, lang="es")))
-                g.add((r_word, METRICAL.wordNumber,
+                # print("WORD TEXT", word_text, token)
+                g.add((r_word, POETIC.content, Literal(word_text)))
+                g.add((r_word, POETIC.wordNumber,
                        Literal(word_count, datatype=XSD.nonNegativeInteger)))
+
                 if int(w_index) == 0:
-                    g.add((r_word_list, METRICAL.firstWord, r_word))
+                    g.add((r_word_list, POETIC.firstWord, r_word))
+                    g.add((r_word, POETIC.firstWordOf, r_word_list))
                 else:
                     prev_w_index = int(w_index) - 1
-                    g.add((r_word, METRICAL.previousWord,
+                    g.add((r_word, POETIC.previousWord,
                            create_uri("W", str(prev_w_index), l_index, st_index,
                                       author, poem_title, dataset)))
                 if int(w_index) + 1 == len(line["tokens"]):
-                    g.add((r_word_list, METRICAL.lastWord, r_word))
+                    g.add((r_word_list, POETIC.lastWord, r_word))
+                    g.add((r_word, POETIC.lastWordOf, r_word_list))
                 else:
                     next_w_index = int(w_index) + 1
-                    g.add((r_word, METRICAL.nextWord,
+                    g.add((r_word, POETIC.nextWord,
                            create_uri("W", str(next_w_index), l_index, st_index,
                                       author, poem_title, dataset)))
-
-                # Add Gramm syllables list to scansion
-                g.add((r_event_scansion, CORE.generated, r_grammatical_list))
-                g.add((r_grammatical_list, CORE.wasGeneratedBy, r_event_scansion))
 
                 # Iterate over Grammatical syllables
                 for sy_index, syllable in enumerate(token['word']):
@@ -516,43 +583,49 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                             st_index, author, poem_title,
                                             dataset)
                     # Add Gram Syllable type
-                    g.add((r_syllable, RDF.type, METRICAL.GrammaticalSyllable))
-                    # Add Gram Syllable to word
-                    g.add((r_word, METRICAL.hasGrammaticalSyllable, r_syllable))
-                    if int(sy_index) == 0:
-                        g.add((r_word, METRICAL.hasFirstGrammaticalSyllable, r_syllable))
-                    if int(sy_index) == len(token['word']) - 1:
-                        g.add((r_word, METRICAL.hasLastGrammaticalSyllable, r_syllable))
+                    g.add((r_syllable, RDF.type, POETIC.GrammaticalSyllable))
+                    # Add Gram Syllable to line
+                    g.add((r_line, POETIC.hasGrammaticalSyllable, r_syllable))
+                    g.add((r_syllable, POETIC.isGrammaticalSyllableOf, r_line))
+                    # Add Gram Syllable analyses word
+                    g.add((r_word, POETIC.isWordAnalysedBy, r_syllable))
+                    g.add((r_syllable, POETIC.analysesWord, r_word))
                     # Add Gram Syllable to Gram Syllable List
-                    g.add((r_grammatical_list, METRICAL.grammaticalSyllable, r_syllable))
+                    g.add((r_grammatical_list, POETIC.grammaticalSyllable, r_syllable))
+                    g.add((r_syllable, POETIC.grammaticalSyllableList,
+                           r_grammatical_list))
 
                     # Add Syllable DP
-                    g.add((r_syllable, METRICAL.grammaticalSyllableNumber,
+                    g.add((r_syllable, POETIC.grammaticalSyllableNumber,
                            Literal(syllable_count,
                                    datatype=XSD.nonNegativeInteger)))
-                    g.add((r_syllable, METRICAL.content,
+                    g.add((r_syllable, POETIC.content,
                            Literal(syllable["syllable"],
                                    datatype=XSD.string)))
-                    g.add((r_syllable, METRICAL.isStressed,
+                    g.add((r_syllable, POETIC.isStressed,
                            Literal(syllable["is_stressed"],
                                    datatype=XSD.boolean)))
                     # first last previous next Gram Syllable
                     if int(sy_index) == 0 and word_count == 0:
                         g.add((r_grammatical_list,
-                               METRICAL.firstGrammaticalSyllable, r_syllable))
+                               POETIC.firstGrammaticalSyllable, r_syllable))
+                        g.add((r_syllable,
+                               POETIC.firstGrammaticalSyllableOf, r_grammatical_list))
                     elif int(sy_index) != 0:
                         prev_sy_index = int(sy_index) - 1
-                        g.add((r_syllable, METRICAL.previousGrammaticalSyllable,
+                        g.add((r_syllable, POETIC.previousGrammaticalSyllable,
                                create_uri("GSY", str(prev_sy_index), w_index,
                                           l_index, st_index, author, poem_title,
                                           dataset)))
                     if int(w_index) + 1 == len(line["tokens"]) and int(
                         sy_index) + 1 == len(token["word"]):
                         g.add((r_grammatical_list,
-                               METRICAL.lastGrammaticalSyllable, r_syllable))
+                               POETIC.lastGrammaticalSyllable, r_syllable))
+                        g.add((r_syllable,
+                               POETIC.lastGrammaticalSyllableOf, r_grammatical_list))
                     else:
                         next_sy_index = int(sy_index) + 1
-                        g.add((r_line, METRICAL.nextLine,
+                        g.add((r_line, POETIC.nextLine,
                                create_uri("GSY", str(next_sy_index), w_index,
                                           l_index, st_index, author, poem_title,
                                           dataset)))
@@ -578,10 +651,6 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                                    "is_stressed": syll["is_stressed"]})
             all_gram_syllables_index = 0
 
-            # Add Metrical syllables list to scansion
-            g.add((r_event_scansion, CORE.generated, r_metrical_list))
-            g.add((r_metrical_list, CORE.wasGeneratedBy, r_event_scansion))
-
             for msyl_index, msyl in enumerate(line["phonological_groups"]):
                 metsyll_list_length = len(line["phonological_groups"])
 
@@ -589,39 +658,51 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                 r_metsyll = create_uri("MSY", str(msyl_index), l_index,
                                             st_index, author, poem_title,
                                             dataset)
-                g.add((r_metsyll, RDF.type, METRICAL.MetricalSyllable))
+                g.add((r_metsyll, RDF.type, POETIC.MetricalSyllable))
 
                 # Add Met Syllable to Met Syllable List
-                g.add((r_metrical_list, METRICAL.metricalSyllable, r_metsyll))
+                g.add((r_metrical_list, POETIC.metricalSyllable, r_metsyll))
+                g.add((r_metsyll, POETIC.metricalSyllableList, r_metrical_list))
+
+                # Add Met Syllable to Line
+                g.add((r_line, POETIC.hasMetricalSyllable, r_metsyll))
+                g.add((r_metsyll, POETIC.isMetricalSyllableOf, r_line))
+                # Add Met Syllable list to line
+                g.add((r_line, POETIC.hasMetricalSyllableList, r_metrical_list))
+                g.add((r_metrical_list, POETIC.isMetricalSyllableListOf, r_line))
 
                 # Add DP - Stress and number
-                g.add((r_metsyll, METRICAL.isStressed,
+                g.add((r_metsyll, POETIC.isStressed,
                        Literal(msyl["is_stressed"],
                                datatype=XSD.boolean)))
-                g.add((r_metsyll, METRICAL.metricalSyllableNumber,
+                g.add((r_metsyll, POETIC.metricalSyllableNumber,
                        Literal(msyl_index,
                                datatype=XSD.nonNegativeInteger)
                        ))
 
                 # Add first/last to list - Add next and prev links MetSyllables
                 if msyl_index == 0:
-                    g.add((r_metrical_list, METRICAL.firstMetricalSyllable, r_metsyll))
+                    g.add((r_metrical_list, POETIC.firstMetricalSyllable, r_metsyll))
+                    g.add((r_metsyll, POETIC.firstMetricalSyllableOf,
+                           r_metrical_list))
                 elif msyl_index > 0:
                     r_prev_metsyll = create_uri("MSY", str(msyl_index - 1),
                                                  l_index,
                                                  st_index, author, poem_title,
                                                  dataset)
-                    g.add((r_metsyll, METRICAL.previousMetricalSyllable, r_prev_metsyll))
+                    g.add((r_metsyll, POETIC.previousMetricalSyllable, r_prev_metsyll))
                     if msyl_index == metsyll_list_length - 1:
-                        g.add((r_metrical_list, METRICAL.lastMetricalSyllable,
+                        g.add((r_metrical_list, POETIC.lastMetricalSyllable,
                                r_metsyll))
+                        g.add((r_metsyll, POETIC.lastMetricalSyllableOf,
+                               r_metrical_list))
                 if msyl_index < metsyll_list_length - 2:
                     r_next_met_syll = create_uri("MSY", str(msyl_index + 1),
                                                  l_index,
                                                  st_index, author,
                                                  poem_title,
                                                  dataset)
-                    g.add((r_metsyll, METRICAL.nextMetricalSyllable, r_next_met_syll))
+                    g.add((r_metsyll, POETIC.nextMetricalSyllable, r_next_met_syll))
 
                 # if all_gram_syllables_index < metsyll_list_length - 1:
                     if not all_gram_syllables[all_gram_syllables_index]["synalepha"]:
@@ -629,7 +710,9 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                                  str(all_gram_syllables[all_gram_syllables_index]["w_number"]),
                                                  l_index, st_index, author, poem_title,
                                                  dataset)
-                        g.add((r_metsyll, METRICAL.analyses, r_gram_syll))
+                        g.add((r_metsyll, POETIC.analysesGrammaticalSyllable, r_gram_syll))
+                        g.add((r_gram_syll, POETIC.isGrammaticalSyllableAnalysedBy,
+                               r_metsyll))
                     else:
                         r_gram_syll_1 = create_uri("GSY",
                                                  str(all_gram_syllables_index),
@@ -644,12 +727,15 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                                                          "w_number"]), l_index, st_index, author,
                                                  poem_title, dataset)
 
-                        g.add((r_metsyll, METRICAL.analyses, r_gram_syll_1))
-                        g.add((r_metsyll, METRICAL.analyses, r_gram_syll_2))
+                        g.add((r_metsyll, POETIC.analysesGrammaticalSyllable, r_gram_syll_1))
+                        g.add((r_gram_syll_1, POETIC.isGrammaticalSyllableAnalysedBy,
+                               r_metsyll))
+                        g.add((r_metsyll, POETIC.analysesGrammaticalSyllable, r_gram_syll_2))
+                        g.add((r_gram_syll_2, POETIC.isGrammaticalSyllableAnalysedBy,
+                               r_metsyll))
                         all_gram_syllables_index += 1
 
                 all_gram_syllables_index += 1
-
             line_count += 1
     return g
 
