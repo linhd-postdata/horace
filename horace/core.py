@@ -65,11 +65,11 @@ def add_core_elements(_json):
     if "year" in _json.keys():
         work_date = _json["year"]
         if work_date is not None:
-            r_conception_date = create_uri("D", author, poem_title)
+            r_conception_date = create_uri("TS_C_", author, poem_title)
             graph.add(
                 (r_conception_date, RDF.type, CORE.TimeSpan))
             if work_date.isdigit():
-                # Todo > Distinguish DPs or distinguish classes (date, textualDate VS period, timePoint)
+                # Distinguish DPs or distinguish classes (date, textualDate VS period, timePoint)
                 graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.date)))
             else:
                 graph.add((r_conception_date, CORE.date, Literal(work_date, datatype=XSD.string)))
