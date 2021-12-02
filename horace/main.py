@@ -2,6 +2,7 @@ import os
 from core import add_core_elements
 from poetic import add_metrical_elements, add_rantanplan_elements
 from rantanplan import get_scansion
+from jollyjumper import get_enjambment
 import json
 import sys
 import getopt
@@ -45,6 +46,7 @@ def generate(corpora_root, rdf_root):
 
         if dataset in spanish_datasets:
             scansion = None
+            enjambments = None
             try:
                 scansion = get_scansion(poem_text, rhyme_analysis=True, rhythm_format="pattern",
                      rhythmical_lengths=None, split_stanzas_on=r"\n\n",
@@ -53,11 +55,19 @@ def generate(corpora_root, rdf_root):
             except:
                 print("Rantanplan Error", " -- ", poem_title, "--", author, "--", dataset)
                 pass
+            try:
+                enjambments = get_enjambment(poem_text)
+                # print(enjambments)
+            except:
+                print("JollyJumper Error")
+                pass
+
             if scansion is not None:
                 try:
-                    rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset)
+                    rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments)
                 except:
                     print("Horace error parsing ", poem_title, "--", author, "--", dataset)
+                    # raise
                     pass
                 # print("PARSED", " -- ", poem_title, "--", author,
 

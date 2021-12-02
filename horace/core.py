@@ -93,8 +93,8 @@ def add_core_elements(_json):
 
     # Add textual content
     if "stanzas" in _json.keys():
-        print("LEN", len([stanza["stanza_text"] for stanza in _json["stanzas"]]))
+        # print("LEN", len([stanza["stanza_text"] for stanza in _json["stanzas"]]))
         text = "\n\n".join(stanza["stanza_text"] for stanza in _json["stanzas"])
         graph.add((r_redaction, CORE.text, Literal(text)))
-        print(text)
+        # print(text)
     return graph

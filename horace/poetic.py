@@ -4,6 +4,8 @@ from rdflib import Graph, RDF, Namespace, Literal, XSD, URIRef, RDFS
 from utils import create_uri, slugify, NAMESPACES
 import time
 
+from jollyjumper import get_enjambment
+
 POETIC = Namespace(NAMESPACES["pdp"])
 CORE = Namespace("http://postdata.linhd.uned.es/ontology/postdata-core#")
 KOS = Namespace("http://postdata.linhd.uned.es/kos/")
@@ -271,7 +273,7 @@ def add_metrical_elements(_json) -> Graph:
     return g
 
 
-def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
+def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments) -> Graph:
     """Function to generate RDF triples from rantanplan scansion output for a
     poem.
 
@@ -401,9 +403,106 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
         g.add((r_stanza, POETIC.hasLineList, r_line_list))
         g.add((r_line_list, POETIC.isLineListOf, r_stanza))
 
+        # Print rhymes in the poem
+        # rhymes = [(line["rhythm"], line["rhyme"]) for line in stanza]
+        # rhymes = [line for line in stanza]
+        # print(rhymes)
+        # for l_index, line in enumerate(stanza):
+            # print("RHYMES FOR LINE # ", l_index, "   ----   ", line["rhythm"], line["rhyme"])
+
+        ### ADD ENJAMBMENTS ###
+
+
+
+        #### ENJAMBMENTS ###
+
+
+        ### ADD RHYMES ###
+        rhymes_list = [(get_last_word_index(line["tokens"]), line["rhyme"], line["rhyme_type"], line["ending"], line_index) for line_index, line in enumerate(stanza)]
+        # Add rhyme info - last Word of Line, add Rhyme to the Word URIRef
+        for (w_ind, rhyme_label, rhyme_type, rhyme_ending, line_index) in rhymes_list:
+            # print(w_ind, rhyme_label, rhyme_type, rhyme_ending, line_index)
+            if rhyme_label != "-":
+                # Rhyme is denoted by a label
+                r_rhyme = create_uri("R", poem_title, author, dataset, rhyme_label, stamp)
+                g.add((r_rhyme, RDF.type, POETIC.Rhyme))
+                g.add((r_rhyme, POETIC.rhymeLabel, Literal(rhyme_label)))
+
+                r_line = create_uri("L", str(line_count), st_index, author,
+                                    poem_title,
+                                    dataset, stamp)
+
+                g.add((r_rhyme, RDF.type, POETIC.Rhyme))
+                g.add((r_rhyme, POETIC.rhymeLabel, Literal(rhyme_label)))
+
+                # Associate current line to the rhyme (label set x stanza)
+                g.add((r_line, POETIC.hasRhyme, r_rhyme))
+                g.add((r_rhyme, POETIC.isRhymeOf, r_line))
+
+                # Associate last word of line with the rhyme
+                r_rhyming_word = create_uri("W", str(w_ind), str(line_index),
+                                            st_index, author, poem_title,
+                                            dataset,
+                                            stamp)
+                g.add((r_rhyme, POETIC.hasRhymingWord, r_rhyming_word))
+                g.add((r_rhyming_word, POETIC.isRhymingWordIn, r_rhyme))
+
+                r_word = create_uri("W", str(w_ind), str(line_index),
+                                    str(st_index),
+                                    author, poem_title, dataset, stamp)
+                g.add((r_word, POETIC.ending, Literal(rhyme_ending)))
+
+                # Look for rhyme matchings
+                prev_indexes = [i for i in range(0, line_index-1)]
+                prev_indexes.reverse()
+                prev_objects = [rhymes_list[j] for j in prev_indexes]
+                # print("Indexes", line_index, prev_objects)
+                # For line in the previous lines of the stanza, look for same label
+                for j in prev_objects:
+                    if j[1] == rhyme_label:
+                        # Create Rhyme match if labels match for a previous line in same stanza
+                        prev_word_line_index = j[4]
+                        prev_word_index = j[0]
+
+                        r_prev_line = create_uri("L", str(prev_word_line_index), st_index, author,
+                                    poem_title,
+                                    dataset, stamp)
+                        r_prev_word = create_uri("W", str(prev_word_index), str(r_prev_line), str(st_index),
+                                        author, poem_title, dataset, stamp)
+
+                        r_next_word = create_uri("W", str(w_ind),
+                                                 str(line_index), str(st_index),
+                                                 author, poem_title, dataset,
+                                                 stamp)
+
+                        r_rhyme_match = create_uri("RM", poem_title, author, dataset, rhyme_label, str(prev_word_line_index), str(line_index), stamp)
+                        g.add((r_rhyme_match, RDF.type, POETIC.RhymeMatch))
+                        g.add((r_rhyme, POETIC.hasRhymeMatch, r_rhyme_match))
+                        g.add((r_rhyme_match, POETIC.isRhymeMatchOf, r_rhyme))
+
+                        g.add((r_rhyme_match, POETIC.rhymeLabel, Literal(rhyme_label)))
+                        g.add((r_rhyme_match, POETIC.rhymeEnding, Literal(rhyme_ending)))
+
+                        g.add((r_rhyme_match, POETIC.hasCallWord, r_prev_word))
+                        g.add((r_prev_word, POETIC.isCallIn, r_rhyme_match))
+
+                        g.add((r_rhyme_match, POETIC.hasEchoWord, r_next_word))
+                        g.add((r_next_word, POETIC.isEchoIn, r_rhyme_match))
+
+                        r_rtype = URIRef(KOS + slugify(rhyme_type))
+
+                        # Add rhyme matching type
+                        g.add((r_rhyme_match, POETIC.typeOfRhymeMatching, r_rtype))
+                        g.add((r_rtype, RDF.type, SKOS.concept))
+                        g.add((r_rtype, RDFS.label, Literal(rhyme_type)))
+                        break
+        ##### RHYMES END #####
+
         # Iterate over lines
         for l_index, line in enumerate(stanza):
             l_index = str(l_index)
+
+            # print("LINEA RHYME", line)
 
             # Create line
             r_line = create_uri("L", str(line_count), st_index, author,
@@ -468,6 +567,24 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
             g.add((r_line, POETIC.hasLinePattern, r_line_pattern))
             g.add((r_line_pattern, POETIC.isLinePatternOf, r_line))
 
+            # Add Enjambments to the line
+            if enjambments.get(line_count):
+                # print(enjambments.get(line_count))
+                r_enjambment = create_uri("ENJ", str(line_count), st_index, author,
+                                poem_title,
+                                dataset, stamp)
+                g.add((r_enjambment, RDF.type, POETIC.Enjambment))
+                g.add((r_enjambment, POETIC.affectsLine, r_line))
+                g.add((r_line, POETIC.isLineAffectedBy, r_enjambment))
+                enjmb_type = enjambments.get(line_count).get("type")
+                r_enjambment_type = URIRef(KOS + slugify(enjmb_type))
+                g.add((r_enjambment, POETIC.typeOfEnjambment, r_enjambment_type))
+                g.add((r_enjambment_type, RDFS.label, Literal(enjmb_type)))
+
+                # Add enjambment to scansion
+                g.add((r_scansion, POETIC.hasDeviceAnnotation, r_enjambment))
+                g.add((r_enjambment, POETIC.isDeviceAnnotationOf, r_scansion))
+
             # Add line DP indexes
             g.add((r_line, POETIC.relativeLineNumber,
                    Literal(l_index, datatype=XSD.nonNegativeInteger)))
@@ -511,35 +628,10 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                        create_uri("L", str(line_count + 1), st_index, author,
                                   poem_title, dataset, stamp)))
 
-            # Add rhyme info - last Word of Line, add Rhyme to the Word URIRef
-            print("LINEA RHYME", line)
-            rhyme_label = line["rhyme"]
-            rhyme_ending = line["ending"]
-            r_rhyme = create_uri("R", rhyme_label, author, poem_title, dataset, stamp)
-            g.add((r_rhyme, RDF.type, POETIC.Rhyme))
-            g.add((r_rhyme, POETIC.rhymeLabel, Literal(rhyme_label)))
-            g.add((r_rhyme, POETIC.rhymeGrapheme, Literal(rhyme_ending)))
-            # Add line has rhyme and rhyme matching type - TODO
-            g.add((r_line, POETIC.hasRhyme, r_rhyme))
-
-            # Get last word index
-            last_word_index = get_last_word_index(line["tokens"])
-            # Add rhyming words
-            r_rhyming_word = create_uri("W", str(last_word_index), l_index,
-                                        st_index, author, poem_title, dataset, stamp)
-            g.add((r_rhyme, POETIC.hasRhymeWord, r_rhyming_word))
-            r_rhyme_type = line["rhyme_type"]
-            r_rtype = URIRef(KOS + slugify(r_rhyme_type))
-            # Add rhyme matching type
-            g.add((r_rhyme, POETIC.presentsRhymeMatching, r_rtype))
-            g.add((r_rtype, RDF.type, SKOS.concept))
-            g.add((r_rtype, RDFS.label, Literal(r_rhyme_type)))
-
             word_count = 0  # Relative to Line
             punct_count = 0
 
             # Iterate over words
-            # TODO- Add punctuation content + next / previous
             for w_index, token in enumerate(line["tokens"]):
                 w_index = str(w_index)
                 if "symbol" in token:
@@ -600,6 +692,26 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset) -> Graph:
                     g.add((r_word, POETIC.nextWord,
                            create_uri("W", str(next_w_index), l_index, st_index,
                                       author, poem_title, dataset, stamp)))
+
+                # Add Synalepha metaplasm
+                # print("TOK", token)
+                for syll in token["word"]:
+                    # print("SYLL", syll)
+                    if "has_synalepha" in syll.keys():
+                        if syll["has_synalepha"] == True:
+                            r_metaplasm = create_uri("MET-SYN", str(word_count), str(l_index), str(st_index),
+                                    author, poem_title, dataset, stamp)
+                            # Associate metaplasm to word
+                            g.add((r_metaplasm, RDF.type, POETIC.Metaplasm))
+                            g.add((r_metaplasm, POETIC.affectsFirstWord, r_word))
+                            g.add((r_word, POETIC.isFirstWordAffectedBy, r_metaplasm))
+                            # Type of metaplasm
+                            r_metaplasm_type = URIRef(KOS + slugify("Synalepha"))
+                            g.add((r_metaplasm, POETIC.typeOfMetaplasm, r_metaplasm_type))
+                            g.add((r_metaplasm_type, RDFS.label, Literal("Synalepha")))
+                            # Add metaplasm to scansion
+                            g.add((r_scansion, POETIC.hasDeviceAnnotation, r_metaplasm))
+                            g.add((r_metaplasm, POETIC.isDeviceAnnotationOf, r_scansion))
 
                 # Iterate over Grammatical syllables
                 for sy_index, syllable in enumerate(token['word']):
