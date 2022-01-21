@@ -6,9 +6,11 @@ from jollyjumper import get_enjambment
 import json
 import sys
 import getopt
+from pyld import jsonld
+from utils import CONTEXT, QUERY
 
 
-def generate(corpora_root, rdf_root):
+def generate(corpora_root, rdf_root, scansions_root):
     total_jsons = {}
     # base_root = "/home/uned/POSTDATA/corpora/"
     base_root = corpora_root
@@ -37,7 +39,21 @@ def generate(corpora_root, rdf_root):
         _json = json.load(open(root))
 
         rdf = add_core_elements(_json)
-        rdf = rdf + add_metrical_elements(_json)
+        if scansions_root is not None:
+            scansion_uri, metrical_elements = add_metrical_elements(_json, n_doc)
+        else:
+            scansion_uri, metrical_elements = add_metrical_elements(_json, None)
+
+        rdf = rdf + metrical_elements
+
+        if scansions_root is not None and metrical_elements is not None:
+            # Generate json-ld for metrical_elements
+            query = QUERY.replace('$', scansion_uri)
+            results = metrical_elements.query(query)
+            json_ld_bytes = results.serialize(format="json-ld")
+            json_ld = transform_json_ld(json_ld_bytes)
+            with open(scansions_root + 'poem_' + str(n_doc) + "_M.json", 'w') as f:
+                json.dump(json_ld, f)
 
         poem_text = "\n\n".join([stanza["stanza_text"] for stanza in _json["stanzas"]])
         poem_title = _json["poem_title"]
@@ -63,18 +79,75 @@ def generate(corpora_root, rdf_root):
                 pass
 
             if scansion is not None:
-                try:
-                    rdf = rdf + add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments)
-                except:
-                    print("Horace error parsing ", poem_title, "--", author, "--", dataset)
+                # try:
+                    if scansions_root is not None:
+                        scansion_uri, rantanplan_scansion_rdf = add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, n_doc)
+
+                    else:
+                        scansion_uri, rantanplan_scansion_rdf = add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, None)
+
+                    rdf = rdf + rantanplan_scansion_rdf
+                    if scansions_root is not None:
+                        # Save rantanplan scansion json-ld
+                        query = QUERY.replace('$', scansion_uri)
+                        results = rantanplan_scansion_rdf.query(query)
+                        json_ld_bytes = results.serialize(format="json-ld")
+                        json_ld = transform_json_ld(json_ld_bytes)
+                        with open(scansions_root + 'poem_' + str(n_doc) + "_A.json",
+                                  'w') as f:
+                            json.dump(json_ld, f)
+                # except:
+                    # print("Horace error parsing ", poem_title, "--", author, "--", dataset)
                     # raise
-                    pass
+                    # pass
                 # print("PARSED", " -- ", poem_title, "--", author,
 
         rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".ttl",
                       format="ttl", encoding="utf-8")
         if n_doc % 300 == 0:
             print("PARSED TO RDF #", n_doc, "--- Last poem -> ", name, root)
+
+
+def transform_json_ld(json_ld):
+    """Returns a json_ld compacted and framed representation of the initial
+    json_ld"""
+    json_ld_result = json.loads(json_ld)
+    framed = jsonld.frame(json_ld_result, json.loads("""{
+	"http://postdata.linhd.uned.es/ontology/postdata-poeticAnalysis#stanzaList": {
+		"@embed": "@always",
+		"http://postdata.linhd.uned.es/ontology/postdata-poeticAnalysis#lineList": {
+			"@embed": "@always"
+		}
+	}
+}"""))
+    with open('json.json', 'w') as outfile:
+        json.dump(json_ld_result, outfile)
+    # framed = jsonld.frame(json_ld_result, {})
+    # print(json.dumps(framed, indent=2))
+    compacted = jsonld.compact(framed, CONTEXT)
+    # graph = compacted.get("@graph")
+    del compacted["@context"]
+    # ordered = sort_jsonld(compacted)
+    # return ordered
+    return compacted
+
+
+def sort_jsonld(jsonld):
+    if "stanzaList" in jsonld:
+        jsonld["stanzaList"] = sorted(jsonld["stanzaList"], key=lambda x: x["stanzaNumber"], reverse=False)
+        for stanza in jsonld["stanzaList"]:
+            if "lineList" in stanza.keys():
+                stanza["lineList"] = sorted(stanza["lineList"], key=lambda x: x["relativeLineNumber"], reverse=False)
+                for line in stanza["lineList"]:
+                    if "metricalSyllableList" in line.keys():
+                        line["metricalSyllableList"] = sorted(line["metricalSyllableList"], key=lambda x: x["metricalSyllableNumber"], reverse=False)
+                    if "wordList" in line.keys():
+                        print(line["wordList"])
+                        line["wordList"] = sorted(line["wordList"], key=lambda x: x["wordNumber"], reverse=False)
+                        for word in line:
+                            if "isWordAnalysedBy" in line:
+                                word["isWordAnalysedBy"] = sorted(word["isWordAnalysedBy"], key=lambda x: x["grammaticalSyllableNumber"], reverse=False)
+    return jsonld
 
 
 def query():
@@ -103,8 +176,10 @@ def main(argv):
     # "/home/uned/POSTDATA/corpora/"
     outputfolder = ''
     # "/home/uned/POSTDATA/KG/"
+    scansionfolder = ''
+    # "home/uned/POSTDATA/SCANSIONS"
     try:
-        opts, args = getopt.getopt(argv, "i:o:", ["ifold=", "ofold="])
+        opts, args = getopt.getopt(argv, "i:o:s:", ["ifold=", "ofold=", "sfold="])
     except getopt.GetoptError:
         sys.exit(2)
     for opt, arg in opts:
@@ -112,9 +187,11 @@ def main(argv):
             inputfolder = arg
         elif opt in ("-o", "--ofold"):
             outputfolder = arg
+        elif opt in ("-s", "--sfold"):
+            scansionfolder = arg
 
-    print("L", inputfolder, outputfolder)
-    generate(inputfolder, outputfolder)
+    print("EXECUTE ARGS : ", inputfolder, outputfolder, scansionfolder)
+    generate(inputfolder, outputfolder, scansionfolder)
 
 
 if __name__ == "__main__":
