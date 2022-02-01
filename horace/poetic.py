@@ -12,8 +12,8 @@ KOS = Namespace("http://postdata.linhd.uned.es/kos/")
 SKOS = Namespace(NAMESPACES["skos"])
 
 
-def add_metrical_elements(_json, n_doc) -> [str, Graph]:
-    g = Graph()
+def add_metrical_elements(cj_store, _json, n_doc) -> str:
+    # g = Graph()
     poem_title = _json["poem_title"]
     author = _json["author"]
     dataset = _json["corpus"]
@@ -21,51 +21,60 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
     f_time = str(time.time())
     stamp = f_time[0:10] + f_time[11:]
 
+    graph_name = "http://postdata.linhd.uned.es/M_" + slugify(author) + "_" + slugify(poem_title) + "_" + str(stamp)
+    g = Graph(cj_store, graph_name)
+    g_def = Graph(cj_store, "tag:stardog:api:context:default")
+
     # Redaction resource
     r_redaction = create_uri("R", author, poem_title, dataset)
-    g.add((r_redaction, RDF.type, CORE.Redaction))
+    g_def.add((r_redaction, RDF.type, CORE.Redaction))
 
     annotation_author = "UNKNOWN"
 
     if "stanzas" in _json.keys():
         # Add manual annotation event
         r_event_scansion = create_uri("SP", author, poem_title, dataset, stamp)
-        g.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
+        g_def.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
         # Add scansion class
         r_scansion = create_uri("SC", author, poem_title, dataset, stamp)
-        g.add((r_scansion, RDF.type, POETIC.Scansion))
+        g_def.add((r_scansion, RDF.type, POETIC.Scansion))
         # Scansion used redaction
-        g.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
-        g.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
+        g_def.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
+        g_def.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
         # Scansion event generated scansion
-        g.add((r_event_scansion, POETIC.generated, r_scansion))
-        g.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
+        g_def.add((r_event_scansion, POETIC.generated, r_scansion))
+        g_def.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
         # Type of scansion
         r_concept_manual_scansion = URIRef(KOS + "ManualAnnotation")
-        g.add((r_scansion, POETIC.typeOfScansion, r_concept_manual_scansion))
-        g.add((r_concept_manual_scansion, RDFS.label,
+        g_def.add((r_scansion, POETIC.typeOfScansion, r_concept_manual_scansion))
+        g_def.add((r_concept_manual_scansion, RDFS.label,
                Literal("Manual Annotation")))
+        # Add graph information
+        g_def.add((r_scansion, POETIC.graphName, URIRef(graph_name)))
 
         # SCANSION TO FILE ID
-        if n_doc is not None:
-            g.add((r_scansion, POETIC.id, Literal("poem_" + str(n_doc) + "_M")))
+        # if n_doc is not None:
+        #     g.add((r_scansion, POETIC.id, Literal("poem_" + str(n_doc) + "_M")))
+
+        # SCANSION TO GRAPH NAME
+        # g.add((r_scansion, POETIC.graph, URIRef(graph_name)))
 
         # Include the agent of the manual annotation
         r_agent_role = create_uri("AR", author, poem_title, dataset, stamp)
-        g.add((r_event_scansion, CORE.hasAgentRole, r_agent_role))
-        g.add((r_agent_role, CORE.isAgentRoleOf, r_event_scansion))
+        g_def.add((r_event_scansion, CORE.hasAgentRole, r_agent_role))
+        g_def.add((r_agent_role, CORE.isAgentRoleOf, r_event_scansion))
         r_agent = create_uri("A", annotation_author)
-        g.add((r_agent, CORE.isAgentOf, r_agent_role))
-        g.add((r_agent_role, CORE.hasAgent, r_agent))
-        g.add((r_agent, CORE.name, Literal(annotation_author)))
+        g_def.add((r_agent, CORE.isAgentOf, r_agent_role))
+        g_def.add((r_agent_role, CORE.hasAgent, r_agent))
+        g_def.add((r_agent, CORE.name, Literal(annotation_author)))
         r_role_function = URIRef(KOS + slugify("ManualAnnotator"))
-        g.add((r_agent_role, CORE.roleFunction, r_role_function))
-        g.add((r_role_function, RDFS.label, Literal("Manual Annotator")))
+        g_def.add((r_agent_role, CORE.roleFunction, r_role_function))
+        g_def.add((r_role_function, RDFS.label, Literal("Manual Annotator")))
 
         # Add stanza list
         r_stanza_list = create_uri("SL", poem_title, author, dataset, stamp)
         g.add((r_stanza_list, RDF.type, POETIC.StanzaList))
-        g.add((r_stanza_list, POETIC.numberOfStanzas, Literal(len(_json["stanzas"]))))
+        g.add((r_stanza_list, POETIC.numberOfStanzas, Literal(len(_json["stanzas"]), datatype=XSD.nonNegativeInteger)))
 
         # Include stanza list to scansion process
         g.add((r_scansion, POETIC.hasListAnnotation, r_stanza_list))
@@ -124,16 +133,16 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
                 r_line_list = create_uri("LL", poem_title, author, dataset, str(st_i), stamp)
                 # Add LineList type
                 g.add((r_line_list, RDF.type, POETIC.LineList))
-                g.add((r_line_list, POETIC.numberOfLines, Literal(len(stanza["lines"]))))
+                g.add((r_line_list, POETIC.numberOfLines, Literal(len(stanza["lines"]), datatype=XSD.nonNegativeInteger)))
                 # Add line list to scansion
                 g.add((r_scansion, POETIC.hasListAnnotation, r_line_list))
                 g.add((r_line_list, POETIC.isListAnnotationOf, r_scansion))
 
                 for l_i, line in enumerate(stanza["lines"]):
-                    line_number = str(line["line_number"])
+                    # line_number = str(line["line_number"])
                     line_text = line["line_text"]
 
-                    r_line = create_uri("L", line_number, stanza_number, author, poem_title,
+                    r_line = create_uri("L", str(l_i), stanza_number, author, poem_title,
                                           dataset, stamp)
                     # Add line type
                     g.add((r_line, RDF.type, POETIC.Line))
@@ -162,7 +171,7 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
                     # Add line DP
                     g.add((r_line, POETIC.content, Literal(line_text)))
                     g.add((r_line, POETIC.relativeLineNumber,
-                           Literal(line_number, datatype=XSD.nonNegativeInteger)))
+                           Literal(l_i, datatype=XSD.nonNegativeInteger)))
                     g.add((r_line, POETIC.absoluteLineNumber,
                            Literal(n_absolute_lines, datatype=XSD.nonNegativeInteger)))
 
@@ -170,9 +179,9 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
 
                     if "words" in line.keys():
                         # Create word list
-                        r_word_list = create_uri("WL", stanza_number, line_number, author, poem_title, dataset, stamp)
+                        r_word_list = create_uri("WL", stanza_number, str(l_i), author, poem_title, dataset, stamp)
                         g.add((r_word_list, RDF.type, POETIC.WordList))
-                        g.add((r_word_list, POETIC.numberOfWords, Literal(len(line["words"]))))
+                        g.add((r_word_list, POETIC.numberOfWords, Literal(len(line["words"]), datatype=XSD.nonNegativeInteger)))
                         # Add Word list to line
                         g.add((r_line, POETIC.hasWordList, r_word_list))
                         g.add((r_word_list, POETIC.isWordListOf, r_line))
@@ -193,7 +202,7 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
                             word_number = str(w_i)
                             word_text = word["word_text"]
 
-                            r_word = create_uri("W", word_number, line_number, stanza_number,
+                            r_word = create_uri("W", word_number, str(l_i), stanza_number,
                                                   author, poem_title, dataset, stamp)
                             # Add word type
                             g.add((r_word, RDF.type, POETIC.Word))
@@ -228,9 +237,9 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
 
                             if "syllables" in word.keys():
                                 # Create syllable list
-                                r_syllable_list = create_uri("GSL", stanza_number, line_number, author, poem_title, dataset, stamp)
+                                r_syllable_list = create_uri("GSL", stanza_number, str(l_i), author, poem_title, dataset, stamp)
                                 g.add((r_syllable_list, RDF.type, POETIC.GrammaticalSyllableList))
-                                g.add((r_syllable_list, POETIC.numberOfGrammaticalSyllables, Literal(len(word["syllables"]))))
+                                g.add((r_syllable_list, POETIC.numberOfGrammaticalSyllables, Literal(len(word["syllables"]), datatype=XSD.nonNegativeInteger)))
                                 # Add Syllable List to Line
                                 g.add((r_line, POETIC.hasGrammaticalSyllableList, r_syllable_list))
                                 g.add((r_syllable_list,
@@ -243,7 +252,7 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
                                     # syllable_number = str(s_i)
                                     syllable_number = count_syllables
                                     r_syllable = create_uri("GSY", str(count_syllables),
-                                                                  word_number, line_number,
+                                                                  word_number, str(l_i),
                                                                   stanza_number, author,
                                                                   poem_title, dataset, stamp)
                                     # Add Syllable type
@@ -279,23 +288,23 @@ def add_metrical_elements(_json, n_doc) -> [str, Graph]:
 
                                     if syllable_number < tot_syllables - 1:
                                         next_syl = create_uri("GSY", str(count_syllables + 1),
-                                                                  word_number, line_number,
+                                                                  word_number, str(l_i),
                                                                   stanza_number, author,
                                                                   poem_title, dataset, stamp)
                                         g.add((r_syllable, POETIC.nextGrammaticalSyllable, next_syl))
                                     if syllable_number > 0:
                                         prev_syl = create_uri("GSY", str(count_syllables - 1),
-                                                                  word_number, line_number,
+                                                                  word_number, str(l_i),
                                                                   stanza_number, author,
                                                                   poem_title, dataset, stamp)
                                         g.add((r_syllable, POETIC.previousGrammaticalSyllable, prev_syl))
 
                                     count_syllables += 1
 
-    return (str(r_scansion), g)
+    return graph_name
 
 
-def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, n_doc) -> [str, Graph]:
+def add_rantanplan_elements(cj_store, scansion, poem_title, author, dataset, enjambments, n_doc) -> str:
     """Function to generate RDF triples from rantanplan scansion output for a
     poem.
 
@@ -311,40 +320,46 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
         POSTDATA Metrical Analysis ontology
     :rtype: Graph
     """
-    g = Graph()
     # Scansion event
     f_time = str(time.time())
     stamp = f_time[0:10] + f_time[11:]
+    graph_name = "http://postdata.linhd.uned.es/A_" + slugify(
+        author) + "_" + slugify(poem_title) + "_" + str(stamp)
+    g = Graph(cj_store, graph_name)
+    g_def = Graph(cj_store, "tag:stardog:api:context:default")
 
     # Create Scansion process
     r_event_scansion = create_uri("SP", author, poem_title, dataset, stamp)
-    g.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
+    g_def.add((r_event_scansion, RDF.type, POETIC.ScansionProcess))
     # Associate agent to scansion process
     r_agent_role = create_uri("AR", "Rantanplan_v.0.6.0", poem_title, dataset, stamp)
-    g.add((r_event_scansion, CORE.hasAgentRole, r_agent_role))
-    g.add((r_agent_role, CORE.isAgentRoleOf, r_event_scansion))
+    g_def.add((r_event_scansion, CORE.hasAgentRole, r_agent_role))
+    g_def.add((r_agent_role, CORE.isAgentRoleOf, r_event_scansion))
     r_rantanplan_agent = URIRef(KOS + "Rantanplan")
-    g.add((r_rantanplan_agent, RDFS.label, Literal("Rantanplan v.0.6.0")))
-    g.add((r_rantanplan_agent, RDFS.seeAlso,
+    g_def.add((r_rantanplan_agent, RDFS.label, Literal("Rantanplan v.0.6.0")))
+    g_def.add((r_rantanplan_agent, RDFS.seeAlso,
            URIRef("https://github.com/linhd-postdata/rantanplan")))
-    g.add((r_agent_role, CORE.hasAgent, r_rantanplan_agent))
-    g.add((r_rantanplan_agent, CORE.isAgentOf, r_agent_role))
+    g_def.add((r_agent_role, CORE.hasAgent, r_rantanplan_agent))
+    g_def.add((r_rantanplan_agent, CORE.isAgentOf, r_agent_role))
     r_annotation_role = URIRef(KOS + "AutomaticAnnotator")
-    g.add((r_annotation_role, RDF.type, SKOS.Concept))
-    g.add((r_annotation_role, RDFS.label, Literal("Automatic Annotator")))
-    g.add((r_agent_role, CORE.roleFunction, r_annotation_role))
+    g_def.add((r_annotation_role, RDF.type, SKOS.Concept))
+    g_def.add((r_annotation_role, RDFS.label, Literal("Automatic Annotator")))
+    g_def.add((r_agent_role, CORE.roleFunction, r_annotation_role))
     r_spanish_syll = URIRef(KOS + "CompleteSpanishSyllabification")
-    g.add((r_event_scansion, POETIC.employedTechnique, r_spanish_syll))
-    g.add((r_spanish_syll, RDFS.label, Literal("Complete Spanish Syllabification")))
+    g_def.add((r_event_scansion, POETIC.employedTechnique, r_spanish_syll))
+    g_def.add((r_spanish_syll, RDFS.label, Literal("Complete Spanish Syllabification")))
     # Scansion created by scansion process
     r_scansion = create_uri("SC", author, poem_title, dataset, stamp)
-    g.add((r_scansion, RDF.type, POETIC.Scansion))
-    g.add((r_event_scansion, POETIC.generated, r_scansion))
-    g.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
+    g_def.add((r_scansion, RDF.type, POETIC.Scansion))
+    g_def.add((r_event_scansion, POETIC.generated, r_scansion))
+    g_def.add((r_scansion, POETIC.isGeneratedBy, r_event_scansion))
     # Type of scansion
     r_concept_auto_scansion = URIRef(KOS + slugify("AutomaticScansion"))
-    g.add((r_scansion, POETIC.typeOfScansion, r_concept_auto_scansion))
-    g.add((r_concept_auto_scansion, RDFS.label, Literal("Automatic Scansion")))
+    g_def.add((r_scansion, POETIC.typeOfScansion, r_concept_auto_scansion))
+    g_def.add((r_concept_auto_scansion, RDFS.label, Literal("Automatic Scansion")))
+
+    # Add graph information
+    g_def.add((r_scansion, POETIC.graphName, URIRef(graph_name)))
 
     # SCANSION TO FILE ID
     if n_doc is not None:
@@ -355,14 +370,14 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
     r_stanza_list = create_uri("SL", poem_title, author, dataset, stamp)
 
     # Scansion used redaction
-    g.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
-    g.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
+    g_def.add((r_event_scansion, POETIC.usedAsInput, r_redaction))
+    g_def.add((r_redaction, POETIC.wasInputFor, r_event_scansion))
     # Scansion generated stanza list
     g.add((r_scansion, POETIC.hasListAnnotation, r_stanza_list))
     g.add((r_stanza_list, POETIC.isListAnnotationOf, r_scansion))
 
     # Add types
-    g.add((r_redaction, RDF.type, CORE.Redaction))
+    g_def.add((r_redaction, RDF.type, CORE.Redaction))
     g.add((r_stanza_list, RDF.type, POETIC.StanzaList))
     # Add stanza list to scansion
     g.add((r_scansion, POETIC.hasStanzaList, r_stanza_list))
@@ -419,7 +434,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
         # Create line list and add type
         r_line_list = create_uri("LL", poem_title, author, dataset, str(st_index), stamp)
         g.add((r_line_list, RDF.type, POETIC.LineList))
-        g.add((r_line_list, POETIC.numberOfLines, Literal(len(stanza))))
+        g.add((r_line_list, POETIC.numberOfLines, Literal(len(stanza), datatype=XSD.nonNegativeInteger)))
         # Add line list to scansion
         g.add((r_scansion, POETIC.hasListAnnotation, r_line_list))
         g.add((r_line_list, POETIC.isListAnnotationOf, r_scansion))
@@ -881,7 +896,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
 
                 print("MET_SYLL_COUNT", met_syll_count)
 
-                if synalepha_counter > 0:
+                if synalepha_counter > 0 and gram_syll["sinaeresis"] is False:
                     synalepha_counter = synalepha_counter - 1
                     # Add analyses between current gram_syll and current met_syll
                     g.add((r_curr_met_syll, POETIC.analysesGrammaticalSyllable,
@@ -953,6 +968,49 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
                     print(gram_syll["content"], "<--->",
                           phonological_groups[met_syll_count], "SIN1")
                     #continue
+                elif gram_syll["sinaeresis"]:
+                    # Add analyses between current gram_syll and current met_syll
+                    g.add((r_curr_met_syll,
+                           POETIC.analysesGrammaticalSyllable,
+                           r_curr_gram_syll))
+                    g.add((r_curr_gram_syll,
+                           POETIC.isGrammaticalSyllableAnalysedBy,
+                           r_curr_met_syll))
+                    # Create metaplasm
+                    r_metaplasm = create_uri("MET-SIN",
+                                             str(gram_syll["s_number"]),
+                                             str(l_index), str(st_index),
+                                             author, poem_title, dataset,
+                                             stamp)
+                    g.add((r_metaplasm, POETIC.typeOfMetaplasm,
+                           r_sinaeresis))
+                    g.add((r_sinaeresis, RDFS.label, Literal("Sinéresis")))
+                    g.add((r_sinaeresis, RDF.type, SKOS.Concept))
+                    # Add metaplasm to gram_syll
+                    g.add((r_curr_gram_syll,
+                           POETIC.isFirstGrammaticalSyllableAffectedBy,
+                           r_metaplasm))
+                    g.add((r_metaplasm,
+                           POETIC.affectsFirstGrammaticalSyllable,
+                           r_curr_gram_syll))
+                    # Add metaplasm to word
+                    g.add((r_metaplasm, POETIC.affectsFirstWord,
+                           r_curr_word))
+                    g.add((r_curr_word, POETIC.isFirstWordAffectedBy,
+                           r_metaplasm))
+                    # Add metaplasm to scansion
+                    g.add((r_scansion, POETIC.hasDeviceAnnotation,
+                           r_metaplasm))
+                    g.add((r_metaplasm, POETIC.isDeviceAnnotationOf,
+                           r_scansion))
+                    print(gram_syll["content"], "<--->",
+                          phonological_groups[met_syll_count], "SIN1")
+                    # If previous gram_syll is affected by synalepha and the
+                    # next gram syll is affected by a sinaeresis, end the
+                    # (consecutive) synalephas.
+                    if synalepha_counter == 1:
+                        synalepha_counter = 0
+                    # continue
                 elif gram_syll["dieresis"]:
                     # Add analyses between current gram_syll and current met_syll
                     g.add((r_curr_met_syll, POETIC.analysesGrammaticalSyllable,
@@ -980,7 +1038,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
                     g.add((r_dieresis, RDFS.label, Literal("Diéresis")))
                     g.add((r_dieresis, RDF.type, SKOS.Concept))
                     index = gram_syll["dieresis_index"]
-                    g.add((r_metaplasm, POETIC.metaplasmIndex, Literal(index, XSD.nonNegativeInteger)))
+                    g.add((r_metaplasm, POETIC.metaplasmIndex, Literal(index, datatype=XSD.nonNegativeInteger)))
                     # Add metaplasm to gram_syll
                     g.add((r_curr_gram_syll,
                            POETIC.isFirstGrammaticalSyllableAffectedBy,
@@ -1009,7 +1067,7 @@ def add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, 
                           phonological_groups[met_syll_count], "LAST")
                     met_syll_count = met_syll_count + 1
             line_count += 1
-    return (str(r_scansion), g)
+    return graph_name
 
 
 def join_lines(stanza):

@@ -172,13 +172,27 @@ CONTEXT = {
 
 
 QUERY = """
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX pdc: <http://postdata.linhd.uned.es/ontology/postdata-core#>
 PREFIX pdp: <http://postdata.linhd.uned.es/ontology/postdata-poeticAnalysis#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
 CONSTRUCT{
     ?scansion
-        pdp:stanzaList ?stanza.
+        pdp:stanzaList ?stanza;
+    	pdp:hasRefrain ?hasRefrain;
+    	pdp:interStrophicRelations ?interStrophicRelations;
+    	pdp:isIsometric ?isIsometric;
+    	pdp:isIsotrophic ?isIsotrophic;
+    	pdp:isUnissonant ?isUnissonant;
+    	pdp:rhymeTypeProportion ?rhymeTypeProportion;
+    	pdp:metricalCategory ?metricalCategory;
+    	pdp:metricalComplexity ?metricalComplexity;
+    	pdp:metricalContext ?metricalContext;
+    	pdp:versificationType ?versificationType;
+    	pdp:acrostic ?acrostic;
+    	pdp:scheme ?scheme;
+    	pdp:trope ?trope.
 
     ?stanza
         pdp:content ?stanza_content;
@@ -186,13 +200,46 @@ CONSTRUCT{
         pdp:typeOfStanza ?type_of_stanza;
         pdp:stanzaNumber ?stanza_number;
         pdp:rhymeScheme ?stanza_type;
-        pdp:metricalType ?metrical_type.
+        pdp:metricalType ?metrical_type;
+    	pdp:altRhymeScheme ?altRhymeScheme;
+    	pdp:clausulaScheme ?clausulaScheme;
+    	pdp:clausulaSchemeType ?clausulaSchemeType;
+ 		pdp:rhymeDispositionType ?rhymeDispositionType;
+    	pdp:paraphrasis ?paraphrasis;
+    	pdp:metricalNotes ?stanza_metricalNotes;
+    	pdp:isMetricStanza ?isMetricStanza;
+    	pdp:typeOfStanzaEdition ?typeOfStanzaEdition.
 
     ?line
         pdp:patterningMetricalScheme ?patterning_metrical_scheme;
         pdp:relativeLineNumber ?relative_line_number;
         pdp:absoluteLineNumber ?absolute_line_number;
-        pdp:content ?line_content.
+        pdp:content ?line_content;
+        pdp:accentedVowelsPattern ?accentedVowelsPattern;
+      	pdp:accentedVowels ?accentedVowels ;
+      	pdp:altPatterningMetricalScheme  ?altPatterningMetricalScheme ;
+        pdp:lineMinLength ?lineMinLength ;
+        pdp:lineMaxLength ?lineMaxLength ;
+        pdp:isHypermetre ?isHypermetre ;
+        pdp:isHypometre ?isHypometre ;
+        pdp:isRegular ?isRegular ;
+        pdp:firstHemistich ?firstHemistich ;
+        pdp:secondHemistich ?secondHemistich ;
+        pdp:isRefrain ?isRefrain ;
+        pdp:hasAnacrusis ?hasAnacrusis ;
+        pdp:hasCaesura ?hasCaesura ;
+        pdp:initialPhonemesPattern ?initialPhonemesPattern ;
+        pdp:initialPhonemesPatternByManner ?initialPhonemesPatternByManner ;
+        pdp:phonemePattern ?phonemePattern ;
+        pdp:phonemePatternByManner ?phonemePatternByManner ;
+        pdp:grammaticalStressPattern ?grammaticalStressPattern ;
+        pdp:scannedLine ?scannedLine ;
+        pdp:feetType ?feetType ;
+        pdp:vowelTypeScheme ?vowelTypeScheme ;
+        pdp:syllabicMetricalScheme ?syllabicMetricalScheme ;
+        pdp:altSyllabicMetricalScheme ?altSyllabicMetricalScheme ;
+        pdp:moraeMetricalScheme ?moraeMetricalScheme ;
+        pdp:altMoraeMetricalScheme ?altMoraeMetricalScheme.
 
     # Q2
     ?line pdp:hasWord ?word;
@@ -207,14 +254,10 @@ CONSTRUCT{
     ?rhymeMatch_call pdp:rhymeGrapheme ?rhyme_grapheme_call;
         pdp:typeOfRhymeMatching ?rhyme_matching_type_call;
         pdp:echoLineNumber ?echo_line_number.
-    #    pdp:hasEchoLine ?echo_line.
-    # ?echo_line pdp:relativeLineNumber ?echo_line_number.
 
     ?rhymeMatch_echo pdp:rhymeGrapheme ?rhyme_grapheme_echo;
         pdp:typeOfRhymeMatching ?rhyme_matching_type_echo;
         pdp:callLineNumber ?call_line_number.
-    #     pdp:hasCallLine ?call_line.
-    # ?call_line pdp:relativeLineNumber ?call_line_number.
 
     ?punctuation pdp:content ?punctuation_content;
         pdp:beforeWordNumber ?before_word_number;
@@ -222,7 +265,12 @@ CONSTRUCT{
 
     ?word pdp:content ?word_content;
         pdp:isWordAnalysedBy ?word_unit;
-        pdp:wordNumber ?word_number.
+        pdp:wordNumber ?word_number;
+    	pdp:ending ?ending;
+      	pdp:lemma ?lemma;
+  		pdp:morphologicalAnnotation ?morphologicalAnnotation ;
+  		pdp:partOfSpeech ?partOfSpeech ;
+  		pdp:translation ?translation.
 
     ?gram_syll pdp:grammaticalSyllableNumber ?gram_syll_number;
         pdp:isStressed ?is_stressed_g;
@@ -235,16 +283,24 @@ CONSTRUCT{
         pdp:content ?met_syll_text;
         pdp:isMetricalSyllableAnalysedBy ?met_syll_unit. # We don't have this in spanish meter.
 
-    # Add Metaplasm
-    # ?scansion pdp:enjambment ?enjambment;
-    #    pdp:metaplasm ?metaplasm.
-
     ?line pdp:isLineAffectedBy ?enjambment.
     ?enjambment pdp:typeOfEnjambment ?type_of_enjambment.
 
     ?gram_syll pdp:isFirsGrammaticalSyllableAffectedBy ?metaplasm.
     ?metaplasm pdp:typeOfMetaplasm ?type_of_metaplasm;
         pdp:metaplasmIndex ?metaplasm_index.
+
+  	?acrostic pdp:typeOfAcrostic ?typeOfAcrostic;
+    	pdp:hasStartingLine ?acrosticStartingLine;
+    	pdp:hasEndingLine ?acrosticEndingLine.
+
+    ?scheme pdp:typeOfScheme ?typeOfScheme;
+    	pdp:hasStartingLine ?schemeStartingLine;
+    	pdp:hasEndingLine ?schemeEndingLine.
+
+    ?trope pdp:typeOfTrope ?typeOfTrope;
+    	pdp:hasStartingLine ?tropeStartingLine;
+    	pdp:hasEndingLine ?tropeEndingLine.
 }
 
 WHERE{
@@ -257,6 +313,189 @@ WHERE{
         pdp:stanzaNumber ?stanza_number;
         pdp:content ?stanza_content;
         pdp:hasLine ?line.
+
+  	OPTIONAL{
+    	?scansion pdp:hasDeviceAnnotation ?acrostic.
+    	?acrostic rdf:type pdp:Acrostic;
+        	pdp:isAcrosticPresentAt ?acrostic_excerpt;
+         	pdp:typeOfAcrostic ?typeOfAcrosticConcept.
+    	?typeOfAcrosticConcept rdfs:label ?typeOfAcrostic.
+    	?acrostic_excerpt pdp:hasStartingLine ?acrosticStartingLine;
+                       	pdp:hasEndingLine ?acrosticEndingLine.
+  	}
+    	OPTIONAL{
+    	?scansion pdp:hasDeviceAnnotation ?scheme.
+    	?scheme rdf:type pdp:Scheme;
+        	pdp:isSchemePresentAt ?scheme_excerpt;
+         	pdp:typeOfScheme ?typeOfSchemeConcept.
+    	?typeOfSchemeConcept rdfs:label ?typeOfScheme.
+    	?scheme_excerpt pdp:hasStartingLine ?schemeStartingLine;
+                       	pdp:hasEndingLine ?schemeEndingLine.
+  	}
+      	OPTIONAL{
+    	?scansion pdp:hasDeviceAnnotation ?trope.
+    	?trope rdf:type pdp:Trope;
+        	pdp:isTropePresentAt ?trope_excerpt;
+         	pdp:typeOfTrope ?typeOfTropeConcept.
+    	?typeOfTropeConcept rdfs:label ?typeOfTrope.
+    	?trope_excerpt pdp:hasStartingLine ?tropeStartingLine;
+                       	pdp:hasEndingLine ?tropeEndingLine.
+  	}
+
+
+  	OPTIONAL{
+    	?word pdp:ending ?ending.
+  	}
+  	OPTIONAL{
+    	?word pdp:lemma ?lemma.
+  	}
+  	  	OPTIONAL{
+    	?word pdp:morphologicalAnnotation ?morphologicalAnnotation.
+  	}
+        	OPTIONAL{
+    	?word pdp:partOfSpeech ?partOfSpeech.
+  	}
+        	OPTIONAL{
+    	?word pdp:translation ?translation
+  	}
+  	OPTIONAL{
+    	?line pdp:accentedVowelsPattern ?accentedVowelsPattern.
+  	}
+        	OPTIONAL{
+    	?line pdp:accentedVowels ?accentedVowels.
+  	}
+        	OPTIONAL{
+    	?line pdp:altPatterningMetricalScheme ?altPatterningMetricalScheme.
+  	}
+        	OPTIONAL{
+    	?line pdp:lineMinLength ?lineMinLength.
+  	}
+        	OPTIONAL{
+    	?line pdp:lineMaxLength ?lineMaxLength.
+  	}
+        	OPTIONAL{
+    	?line pdp:isHypermetre ?isHypermetre.
+  	}
+        	OPTIONAL{
+    	?line pdp:isHypometre ?isHypometre.
+  	}
+        	OPTIONAL{
+    	?line pdp:isRegular ?isRegular.
+  	}
+        	OPTIONAL{
+    	?line pdp:firstHemistich ?firstHemistich.
+  	}
+        	OPTIONAL{
+    	?line pdp:secondHemistich ?secondHemistich.
+  	}
+        	OPTIONAL{
+    	?line pdp:isRefrain ?isRefrain.
+  	}
+        	OPTIONAL{
+    	?line pdp:hasAnacrusis ?hasAnacrusis.
+  	}
+        	OPTIONAL{
+    	?line pdp:hasCaesura ?hasCaesura.
+  	}
+        	OPTIONAL{
+    	?line pdp:initialPhonemesPattern ?initialPhonemesPattern.
+  	}
+        	OPTIONAL{
+    	?line pdp:initialPhonemesPatternByManner ?initialPhonemesPatternByManner.
+  	}
+        	OPTIONAL{
+    	?line pdp:phonemePattern ?phonemePattern.
+  	}
+        	OPTIONAL{
+    	?line pdp:phonemePatternByManner ?phonemePatternByManner.
+  	}
+        	OPTIONAL{
+    	?line pdp:grammaticalStressPattern ?grammaticalStressPattern.
+  	}
+        	OPTIONAL{
+    	?line pdp:scannedLine ?scannedLine.
+  	}
+        	OPTIONAL{
+    	?line pdp:feetType ?feetType.
+  	}
+        	OPTIONAL{
+    	?line pdp:vowelTypeScheme ?vowelTypeScheme.
+  	}
+        	OPTIONAL{
+    	?line pdp:syllabicMetricalScheme ?syllabicMetricalScheme.
+  	}
+        	OPTIONAL{
+    	?line pdp:altSyllabicMetricalScheme ?altSyllabicMetricalScheme.
+  	}
+        	OPTIONAL{
+    	?line pdp:moraeMetricalScheme ?moraeMetricalScheme.
+  	}
+        	OPTIONAL{
+    	?line pdp:altMoraeMetricalScheme ?altMoraeMetricalScheme.
+  	}
+     OPTIONAL{
+    	?stanza pdp:altRhymeScheme ?altRhymeScheme.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:clausulaScheme ?clausulaScheme.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:clausulaSchemeType ?clausulaSchemeTypeConcept.
+    	?clausulaSchemeTypeConcept rdfs:label ?clausulaSchemeType.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:rhymeDispositionType ?rhymeDispositionTypeConcept.
+    	?rhymeDispositionTypeConcept rdfs:label ?rhymeDisposition.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:paraphrasis ?paraphrasis.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:metricalNotes ?stanza_metricalNotes.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:isMetricStanza ?isMetricStanza.
+  	}
+        	OPTIONAL{
+    	?stanza pdp:typeOfStanzaEdition ?typeOfStanzaEditionConcept.
+    	?typeOfStanzaEditionConcept rdfs:label ?typeOfStanzaEdition.
+  	}
+
+
+  	OPTIONAL{
+    	?scansion pdc:hasRefrain ?hasRefrain.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:interStrophicRelations ?interStrophicRelations.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:isIsometric ?isIsometric.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:isIsotrophic ?isIsotrophic.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:isUnissonant ?isUnissonant.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:rhymeTypeProportion ?rhymeTypeProportion.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:metricalCategory ?metricalCategoryConcept.
+    	?metricalCategoryConcept rdfs:label ?metricalCategory.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:metricalComplexity ?metricalComplexityConcept.
+    	?metricalComplexityConcept rdfs:label ?metricalComplexity.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:metricalContext ?metricalContextConcept.
+    	?metricalContextConcept rdfs:label ?metricalContext.
+  	}
+    	OPTIONAL{
+    	?scansion pdc:versificationType ?versificationTypeConcept.
+    	?versificationTypeConcept rdfs:label ?versificationType.
+  	}
 
     OPTIONAL{
         ?stanza pdp:typeOfStanza ?type_of_stanza.
@@ -278,12 +517,6 @@ WHERE{
     OPTIONAL{
         ?word pdp:isWordAnalysedBy ?word_unit.
     }
-
-    # OPTIONAL{
-    #     ?word pdp:isFirstWordAffectedBy ?metaplasm.
-    #     ?metaplasm pdp:typeOfMetaplasm ?mtp_type.
-    #     ?mtp_type rdfs:label ?type_of_metaplasm.
-    # }
 
     OPTIONAL{
         ?line pdp:hasGrammaticalSyllable ?gram_syll.

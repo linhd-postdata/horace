@@ -8,6 +8,7 @@ import sys
 import getopt
 from pyld import jsonld
 from utils import CONTEXT, QUERY
+from rdflib import Graph, ConjunctiveGraph
 
 
 def generate(corpora_root, rdf_root, scansions_root):
@@ -34,26 +35,33 @@ def generate(corpora_root, rdf_root, scansions_root):
 
     n_doc = 0
     for name, root in total_jsons.items():
+        rdf = ConjunctiveGraph()
         n_doc += 1
 
         _json = json.load(open(root))
 
-        rdf = add_core_elements(_json)
+        # rdf = add_core_elements(rdf, _json)
+        add_core_elements(rdf.store, _json)
+        length = 0
+        for quad in rdf.quads():
+            length += 1
+        print("LEN1", length)
+        for con in rdf.contexts():
+            print("CON1", con)
+
         if scansions_root is not None:
-            scansion_uri, metrical_elements = add_metrical_elements(_json, n_doc)
+            scansion_graph_uri = add_metrical_elements(rdf.store, _json, n_doc)
         else:
-            scansion_uri, metrical_elements = add_metrical_elements(_json, None)
+            scansion_graph_uri = add_metrical_elements(rdf.store, _json, None)
 
-        rdf = rdf + metrical_elements
+        # rdf = metrical_elements
+        length = 0
+        for quad in rdf.quads():
+            length += 1
+        print("LEN2", length)
 
-        if scansions_root is not None and metrical_elements is not None:
-            # Generate json-ld for metrical_elements
-            query = QUERY.replace('$', scansion_uri)
-            results = metrical_elements.query(query)
-            json_ld_bytes = results.serialize(format="json-ld")
-            json_ld = transform_json_ld(json_ld_bytes)
-            with open(scansions_root + 'poem_' + str(n_doc) + "_M.json", 'w') as f:
-                json.dump(json_ld, f)
+        for con in rdf.contexts():
+            print("CON2", con)
 
         poem_text = "\n\n".join([stanza["stanza_text"] for stanza in _json["stanzas"]])
         poem_title = _json["poem_title"]
@@ -81,29 +89,26 @@ def generate(corpora_root, rdf_root, scansions_root):
             if scansion is not None:
                 # try:
                     if scansions_root is not None:
-                        scansion_uri, rantanplan_scansion_rdf = add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, n_doc)
+                        scansion_graph_uri = add_rantanplan_elements(rdf.store, scansion, poem_title, author, dataset, enjambments, n_doc)
 
                     else:
-                        scansion_uri, rantanplan_scansion_rdf = add_rantanplan_elements(scansion, poem_title, author, dataset, enjambments, None)
+                        scansion_graph_uri = add_rantanplan_elements(rdf.store, poem_title, author, dataset, enjambments, None)
 
-                    rdf = rdf + rantanplan_scansion_rdf
-                    if scansions_root is not None:
-                        # Save rantanplan scansion json-ld
-                        query = QUERY.replace('$', scansion_uri)
-                        results = rantanplan_scansion_rdf.query(query)
-                        json_ld_bytes = results.serialize(format="json-ld")
-                        json_ld = transform_json_ld(json_ld_bytes)
-                        with open(scansions_root + 'poem_' + str(n_doc) + "_A.json",
-                                  'w') as f:
-                            json.dump(json_ld, f)
                 # except:
                     # print("Horace error parsing ", poem_title, "--", author, "--", dataset)
                     # raise
                     # pass
                 # print("PARSED", " -- ", poem_title, "--", author,
+        length = 0
+        for quad in rdf.quads():
+            length += 1
+        print("LEN3", length)
 
-        rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".ttl",
-                      format="ttl", encoding="utf-8")
+        for con in rdf.contexts():
+            print("CON3", con)
+
+        rdf.serialize(rdf_root + "poem_" + str(n_doc) + ".nquads",
+                      format="nquads", encoding="utf-8")
         if n_doc % 300 == 0:
             print("PARSED TO RDF #", n_doc, "--- Last poem -> ", name, root)
 

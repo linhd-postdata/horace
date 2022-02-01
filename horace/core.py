@@ -14,8 +14,8 @@ def to_rdf(_json) -> Graph:
     return graph
 
 
-def add_core_elements(_json):
-    graph = Graph()
+def add_core_elements(cj_store, _json):
+    graph = Graph(store=cj_store, identifier="tag:stardog:api:context:default")
 
     # Add namespaces
     for prefix, uri_ns in NAMESPACES.items():
@@ -97,4 +97,4 @@ def add_core_elements(_json):
         text = "\n\n".join(stanza["stanza_text"] for stanza in _json["stanzas"])
         graph.add((r_redaction, CORE.text, Literal(text)))
         # print(text)
-    return graph
+    # return conjunctive_graph
